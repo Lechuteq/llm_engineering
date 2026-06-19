@@ -3,35 +3,25 @@
 > **GitHub:** [github.com/Lechuteq/llm_engineering](https://github.com/Lechuteq/llm_engineering)
 > **Author of course:** Ed Donner ([ed-donner/llm_engineering](https://github.com/ed-donner/llm_engineering))
 > **Student:** Lesław Nowakowski (Lechuteq)
-> **Period:** November 2025 – May 2026 (ongoing)
+> **Period:** January 2025 – June 2026 (completed)
 
 ---
 
-## Sync Status Notice (2026-06-19)
+## Sync Status Notice (2026-06-19 — updated)
 
-**Reported progress:** 6 of 8 weeks completed.
-**Synced to GitHub:** Weeks 1, 2, 3 (Week 3 Colab notebooks uploaded 2026-06-19).
-**Missing from this machine:** Weeks 4, 5, 6 work.
+**Reported progress:** 8 of 8 weeks completed.
+**Synced to GitHub:** All weeks 1–8 committed and pushed.
 
-The portfolio in [`projects/`](./projects/) reflects Weeks 1 and 2 currently.
+**Still missing from all machines found so far:**
+- `week1/day3.ipynb` — no Colab link found in neighboring notebooks
+- `week4/day1.ipynb` — no Colab link found; may be on Win11/Ubuntu home machine
+- `week4/day2.ipynb` — no Colab link found; may be on Win11/Ubuntu home machine
+- `week7/day3.ipynb` — confirmed done on Google Colab (link in day2.ipynb)
+- `week7/day4.ipynb` — confirmed done on Google Colab (link in day5.ipynb)
 
-**Likely locations of missing work (to check at home):**
-- 🏠 Home Windows 11 machine — local clone never pushed
-- 🏠 Home Ubuntu machine — different local clone never pushed
-- ☁️ Google Colab — check `colab.research.google.com → File → Recent notebooks`
-- 📄 Loose `.ipynb` files in Downloads / Documents folders
-
-**Search commands:**
-```bash
-# Linux / macOS / WSL
-find / -name "day*.ipynb" -path "*week[4-8]*" 2>/dev/null
-
-# Windows PowerShell
-Get-ChildItem -Path C:\ -Recurse -Filter "day*.ipynb" -ErrorAction SilentlyContinue |
-  Where-Object { $_.FullName -match "week[4-8]" }
-```
-
-**Next steps once found:** Drop them in `week4/`, `week5/`, etc., commit + push to origin, and extend the portfolio with projects `05_`, `06_`, … accordingly.
+**Week 4 execution outputs committed (2026-06-19):**
+- `week4/day3.ipynb` — C++ generator run on Ubuntu 24.04 / i5-14600K, cell outputs saved
+- `week4/day5.ipynb` — Rust generator notebook updated
 
 ---
 

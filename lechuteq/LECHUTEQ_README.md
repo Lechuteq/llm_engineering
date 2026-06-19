@@ -385,9 +385,92 @@ DealAgentFramework
 
 ---
 
-### 🗂️ WEEK 7 — Fine-tuning with QLoRA
+### 🗂️ WEEK 7 — Fine-tuning with QLoRA: "The Price is Right"
 
-> Week 7 notebooks are committed (days 1–5 + NEW_ updated variants). Full breakdown to be added.
+Fine-tune **Llama 3.2-3B** on 400,000 Amazon product descriptions to predict product prices from text — and beat every frontier model including GPT-5.1.
+
+All training ran on Google Colab (T4 for Lite mode, A100 for Full mode). The repo contains both the original day notebooks (with Colab links) and updated `NEW_` versions with full code.
+
+---
+
+#### Day 1: Introduction to LoRA & QLoRA
+**Goal:** Understand the theory and math behind LoRA (Low-Rank Adaptation) before training — why it works, how much memory it saves, and how to read the adapter weights.
+
+**What was explored:**
+- Loading Llama 3.2-3B in three precisions and comparing memory footprint:
+  - Full precision: ~6.4 GB
+  - 8-bit: ~3.2 GB
+  - 4-bit NF4 (double quant): ~1.9 GB
+- Loading a fine-tuned model on top of the 4-bit base with `PeftModel.from_pretrained()`
+- **LoRA math:** each target module gets two low-rank adapter matrices `lora_A` and `lora_B`, and weights are updated as `base + alpha * lora_A @ lora_B`
+- Calculated trainable parameter counts:
+  - **Lite mode** (`r=32`, attention layers only): ~13M trainable params out of 3B total
+  - **Full mode** (`r=256`, attention + MLP layers): significantly more, covering the whole model
+
+**Tech stack:** `transformers`, `peft` (`LoraConfig`, `PeftModel`), `bitsandbytes`, Colab T4.
+
+---
+
+#### Day 2: Prompt Data Preparation + Base Model Evaluation
+**Goal:** Shape the raw Amazon dataset into fine-tuning prompts, then measure the base model's performance as a baseline.
+
+**What was built:**
+- Loaded `ed-donner/items_prompts_lite` (Lite) or `ed-donner/items_prompts_full` (Full) from HuggingFace Hub
+- Token count histogram — cutoff set at 110 tokens (truncates ~X% of items)
+- `item.make_prompts(tokenizer, cutoff, include_price)` — builds training prompt + completion pairs
+- Prompt format: product description → model must generate just the price as a number
+- Pushed prompt datasets back to HuggingFace Hub
+- **Base model evaluation:** `model_predict(item)` with `max_new_tokens=8` on Llama 3.2-3B 4-bit
+- Baseline RMSE: **110.72** — worse than a constant predictor (the base model has no pricing knowledge)
+
+**Tech stack:** `transformers` (`AutoTokenizer`), `datasets`, `huggingface_hub`, `matplotlib`.
+
+---
+
+#### Days 3 & 4: QLoRA Training
+**Goal:** Fine-tune Llama 3.2-3B with QLoRA using Supervised Fine-Tuning Trainer (`SFTTrainer`) and track with Weights & Biases.
+
+**What was built:**
+- **Quantization config:** 4-bit NF4, double quant, bfloat16 compute dtype
+- **LoRA config** (`LoraConfig`): `r`, `lora_alpha`, `lora_dropout`, `task_type="CAUSAL_LM"`, `target_modules`
+- **Training config** (`SFTConfig`):
+  - Lite mode: 1 epoch, batch size 32, T4 GPU
+  - Full mode: 3 epochs, batch size 256, A100 GPU
+  - Optimizer, gradient accumulation, warmup ratio, cosine LR scheduler, weight decay 0.001
+- **W&B integration:** `wandb.init(project=PROJECT_NAME)` — logged loss curves and eval metrics
+- `SFTTrainer.train()` — ran fine-tuning, checkpointed every `SAVE_STEPS`
+- `fine_tuning.model.push_to_hub(PROJECT_RUN_NAME, private=True)` → pushed to `UserPWG/price-{timestamp}` on HuggingFace
+
+**Tech stack:** `transformers` (`TrainingArguments`), `trl` (`SFTTrainer`, `SFTConfig`), `peft` (`LoraConfig`), `bitsandbytes`, `wandb`, Colab T4 (Lite) / A100 (Full).
+
+---
+
+#### Day 5: Evaluation & Results
+**Goal:** Measure the fine-tuned model against all baselines and frontier models.
+
+**Benchmark results (RMSE — lower is better):**
+
+| Model | RMSE | Type |
+|-------|------|------|
+| Constant baseline | 106.18 | Baseline |
+| Base Llama 3.2 4-bit | 110.72 | Open source (untrained) |
+| Linear Regression | 101.56 | Classical ML |
+| Random Forest | 72.28 | Classical ML |
+| XGBoost | 68.23 | Classical ML |
+| Human (Ed) | 87.62 | Human |
+| GPT-4.1 Nano | 62.51 | Frontier |
+| Neural Network | 63.97 | Custom DNN |
+| Fine-tuned Lite | 65.40 | Fine-tuned (T4, 1 epoch) |
+| Grok 4.1 Fast | 57.62 | Frontier |
+| Gemini 3 Pro | 50.54 | Frontier |
+| Claude 4.5 Sonnet | 47.10 | Frontier |
+| Deep Neural Network | 46.49 | Custom DNN (Week 6) |
+| GPT-5.1 | 44.74 | Frontier (best commercial) |
+| **Fine-tuned Full** | **39.85** | **Fine-tuned (A100, 3 epochs) 🏆** |
+
+**Key insight:** The Fine-tuned Full model (39.85 RMSE) **beats every frontier model** including GPT-5.1 — despite being a 3B parameter model vs. GPT-5.1's trillions. Domain-specific fine-tuning on 400k examples wins over raw model size.
+
+**Tech stack:** `plotly` (benchmark bar chart), `transformers`, `peft`.
 
 ---
 
@@ -438,10 +521,11 @@ You've already mastered:
 - **Tip:** Your knowledge-base could be a personal collection (e.g., Polish business/legal documents — building on your Day 1 SME analysis use case)
 - Connect the RAG pipeline to a Gradio UI like you did in Week 2 Day 4–5
 
-#### 5. **Week 6–7 — Fine-tuning**
-- Wandb is in your stack — set up an account early (`wandb.init()` requires an API key)
-- **Tip:** Track experiments early. Don't fine-tune blindly.
-- The course uses HuggingFace `datasets==3.6.0` (pinned for compatibility)
+#### 5. **Week 6–7 — Fine-tuning ✅ DONE**
+- Your fine-tuned full model (39.85 RMSE) beat GPT-5.1 (44.74) — the headline result of the whole course
+- **Key takeaway:** Domain-specific fine-tuning on enough data beats raw model size. A 3B model with 400k examples outperforms a trillion-parameter frontier model
+- **W&B tracking proved its worth:** experiment logs let you compare Lite vs. Full training runs without re-running everything
+- **QLoRA pattern is reusable:** the `LoraConfig` + `SFTTrainer` + `push_to_hub` pipeline from Days 3-4 is the standard recipe for any future fine-tuning task
 
 #### 6. **Week 8 — Agentic AI ✅ DONE**
 - You built the full capstone: ScannerAgent → EnsembleAgent (RAG + Modal specialist + neural net) → MessagingAgent → AutonomousPlanningAgent → Gradio UI
@@ -779,6 +863,69 @@ Wszystkie notebooki Tygodnia 3 uruchamiały się na **Google Colab** z darmowym 
 
 ---
 
+### 🗂️ TYDZIEŃ 7 — Fine-tuning z QLoRA: „The Price is Right"
+
+Fine-tuning **Llama 3.2-3B** na 400 000 opisach produktów Amazon do przewidywania cen produktów z tekstu — i pobicie każdego modelu frontierowego, w tym GPT-5.1.
+
+---
+
+#### Dzień 1: Wprowadzenie do LoRA i QLoRA
+**Cel:** Zrozumienie teorii i matematyki stojącej za LoRA przed treningiem — dlaczego działa, ile pamięci oszczędza i jak czytać wagi adaptera.
+
+**Co zostało zbadane:**
+- Ładowanie Llama 3.2-3B w trzech precyzjach i porównanie śladu pamięci: pełna (~6,4 GB), 8-bit (~3,2 GB), 4-bit NF4 (~1,9 GB)
+- **Matematyka LoRA:** każdy docelowy moduł otrzymuje dwie niskorangowe macierze adapterów `lora_A` i `lora_B`, wagi aktualizowane jako `base + alpha * lora_A @ lora_B`
+- Tryb Lite: r=32, tylko warstwy uwagi (~13M trenowalnych parametrów z 3B łącznie)
+- Tryb Full: r=256, uwaga + warstwy MLP
+
+**Stack technologiczny:** `transformers`, `peft` (`LoraConfig`, `PeftModel`), `bitsandbytes`.
+
+---
+
+#### Dzień 2: Przygotowanie danych promptów + Ewaluacja modelu bazowego
+**Cel:** Przekształcenie surowego datasetu Amazon w prompty do fine-tuningu i zmierzenie wydajności modelu bazowego jako punktu odniesienia.
+
+**Co zostało zbudowane:**
+- Ładowanie datasetu z HuggingFace Hub + histogram liczby tokenów (cutoff: 110 tokenów)
+- `item.make_prompts(tokenizer, cutoff, include_price)` — buduje pary prompt + completion
+- Wypchnięcie datasetu promptów z powrotem do HuggingFace Hub
+- **Ewaluacja modelu bazowego** — RMSE: **110,72** (gorszy niż stały predyktor!)
+
+**Stack technologiczny:** `transformers`, `datasets`, `huggingface_hub`, `matplotlib`.
+
+---
+
+#### Dni 3 i 4: Trening QLoRA
+**Cel:** Fine-tuning Llama 3.2-3B z QLoRA używając `SFTTrainer` ze śledzeniem w Weights & Biases.
+
+**Co zostało zbudowane:**
+- Konfiguracja kwantyzacji 4-bit NF4 + konfiguracja LoRA (`LoraConfig`)
+- `SFTConfig`: tryb Lite (1 epoka, batch 32, T4) lub Full (3 epoki, batch 256, A100)
+- Integracja W&B: `wandb.init()` — rejestrowanie krzywych strat i metryk ewaluacji
+- `SFTTrainer.train()` → `push_to_hub()` do `UserPWG/price-{timestamp}` na HuggingFace
+
+**Stack technologiczny:** `trl` (`SFTTrainer`, `SFTConfig`), `peft`, `bitsandbytes`, `wandb`, Colab T4/A100.
+
+---
+
+#### Dzień 5: Ewaluacja i wyniki
+**Kluczowe wyniki (RMSE — im niżej, tym lepiej):**
+
+| Model | RMSE |
+|-------|------|
+| Bazowy Llama 3.2 4-bit | 110,72 |
+| GPT-4.1 Nano | 62,51 |
+| Fine-tuned Lite | 65,40 |
+| Gemini 3 Pro | 50,54 |
+| Claude 4.5 Sonnet | 47,10 |
+| Deep Neural Network | 46,49 |
+| GPT-5.1 | 44,74 |
+| **Fine-tuned Full** | **39,85 🏆** |
+
+**Kluczowy wniosek:** Model Fine-tuned Full (39,85 RMSE) **pobił każdy model frontierowy** łącznie z GPT-5.1. Fine-tuning domenowy na wystarczającej ilości danych wygrywa z surowym rozmiarem modelu.
+
+---
+
 ### 🗂️ TYDZIEŃ 8 — Agentic AI: „The Price is Right"
 
 Projekt kulminacyjny. W pełni autonomiczny system wieloagentowy, który przeszukuje internet w poszukiwaniu okazji produktowych, szacuje prawdziwą wartość produktów za pomocą wielu strategii AI i wysyła powiadomienia push na telefon — wszystko orkiestrowane przez agenta planującego w interfejsie Gradio.
@@ -984,5 +1131,5 @@ llm_engineering/
 
 ---
 
-*Dokument przygotowany: 27 maja 2026 | Zaktualizowany: 19 czerwca 2026 (Tygodnie 3 i 8 dodane)*
-*Document prepared: May 27, 2026 | Updated: June 19, 2026 (Weeks 3 and 8 added)*
+*Dokument przygotowany: 27 maja 2026 | Zaktualizowany: 19 czerwca 2026 (Tygodnie 3, 7 i 8 dodane)*
+*Document prepared: May 27, 2026 | Updated: June 19, 2026 (Weeks 3, 7 and 8 added)*

@@ -7,31 +7,31 @@
 
 ---
 
-## ⚠️ Sync Status Notice (2026-05-27)
+## Sync Status Notice (2026-06-19)
 
 **Reported progress:** 6 of 8 weeks completed.
-**Actually present in GitHub repo:** Week 1 + Week 2 only (last commit `dea65b19` on 2025-12-20).
-**Missing from this machine:** Weeks 3, 4, 5, 6 work.
+**Synced to GitHub:** Weeks 1, 2, 3 (Week 3 Colab notebooks uploaded 2026-06-19).
+**Missing from this machine:** Weeks 4, 5, 6 work.
 
-The portfolio in [`projects/`](./projects/) reflects only what is currently synced to this machine and to GitHub.
+The portfolio in [`projects/`](./projects/) reflects Weeks 1 and 2 currently.
 
 **Likely locations of missing work (to check at home):**
 - 🏠 Home Windows 11 machine — local clone never pushed
 - 🏠 Home Ubuntu machine — different local clone never pushed
-- ☁️ Google Colab — course uses Colab for Weeks 3 & 7 (GPU work). Check `colab.research.google.com → File → Recent notebooks`
+- ☁️ Google Colab — check `colab.research.google.com → File → Recent notebooks`
 - 📄 Loose `.ipynb` files in Downloads / Documents folders
 
 **Search commands:**
 ```bash
 # Linux / macOS / WSL
-find / -name "day*.ipynb" -path "*week[3-8]*" 2>/dev/null
+find / -name "day*.ipynb" -path "*week[4-8]*" 2>/dev/null
 
 # Windows PowerShell
 Get-ChildItem -Path C:\ -Recurse -Filter "day*.ipynb" -ErrorAction SilentlyContinue |
-  Where-Object { $_.FullName -match "week[3-8]" }
+  Where-Object { $_.FullName -match "week[4-8]" }
 ```
 
-**Next steps once found:** Drop them in `week3/`, `week4/`, etc., commit + push to origin, and extend the portfolio with projects `05_`, `06_`, … accordingly.
+**Next steps once found:** Drop them in `week4/`, `week5/`, etc., commit + push to origin, and extend the portfolio with projects `05_`, `06_`, … accordingly.
 
 ---
 
@@ -50,7 +50,11 @@ Get-ChildItem -Path C:\ -Recurse -Filter "day*.ipynb" -ErrorAction SilentlyConti
 | 2 | 3 | ✅ Done (synced) | Conversational AI Chatbot |
 | 2 | 4 | ✅ Done (synced) | Airline AI with Tools (SQLite) |
 | 2 | 5 | ✅ Done (synced) | Multimodal AI Assistant |
-| 3 | 1-5 | 🔍 Done elsewhere — needs sync | Open Source / Hugging Face / Colab |
+| 3 | 1 | ✅ Done (synced) | Colab + GPU Setup + Image Generation (diffusers) |
+| 3 | 2 | ✅ Done (synced) | HuggingFace Pipelines (high-level API) |
+| 3 | 3 | ✅ Done (synced) | Tokenizers deep-dive |
+| 3 | 4 | ✅ Done (synced) | Models lower-level API + 4-bit quantization |
+| 3 | 5 | ✅ Done (synced) | Meeting Minutes product (Audio → Whisper → Llama) |
 | 4 | 1-5 | 🔍 Done elsewhere — needs sync | Code Generation |
 | 5 | 1-5 | 🔍 Done elsewhere — needs sync | RAG (Retrieval Augmented Generation) |
 | 6 | 1-5 | 🔍 Done elsewhere — needs sync | Fine-tuning |
@@ -174,18 +178,123 @@ Get-ChildItem -Path C:\ -Recurse -Filter "day*.ipynb" -ErrorAction SilentlyConti
 
 ---
 
+### 🗂️ WEEK 3 — Open Source Models, HuggingFace & Google Colab
+
+All Week 3 notebooks ran on **Google Colab** with a free Tesla T4 GPU (16 GB VRAM). HuggingFace `HF_TOKEN` was provided via Colab Secrets.
+
+---
+
+#### Day 1: Google Colab Setup + Generative Image Models
+**Goal:** First exposure to Google Colab as a GPU cloud environment, and running state-of-the-art image diffusion models without any local hardware.
+
+**What was built:**
+- GPU check via `nvidia-smi` confirming Tesla T4 connection
+- HuggingFace login with `HF_TOKEN` from Colab Secrets
+- Image generation with **SDXL-Turbo** (`stabilityai/sdxl-turbo`) — fast 4-step diffusion
+- Image generation with **Stable Diffusion XL Base 1.0** (`stabilityai/stable-diffusion-xl-base-1.0`)
+- **Two-model pipeline:** SDXL Base + SDXL Refiner chained together for higher quality
+- Text-to-speech synthesis with `microsoft/speecht5_tts` + speaker embeddings from CMU Arctic dataset
+- Showcase of **FLUX.1-schnell** (`black-forest-labs/FLUX.1-schnell`) running on a premium A100 GPU (paid tier demo with cost estimation: ~$0.015/run)
+
+**Tech stack:** `diffusers`, `transformers`, `torch`, `datasets`, `soundfile`, `huggingface_hub`, Colab T4 GPU.
+
+---
+
+#### Day 2: HuggingFace Pipelines (High-Level Inference API)
+**Goal:** Master the `pipeline()` abstraction from HuggingFace — one unified API for a dozen different AI tasks.
+
+**What was built / explored:**
+- **Sentiment analysis** — default model + `nlptown/bert-base-multilingual-uncased-sentiment` (5-star output)
+- **Named Entity Recognition (NER)** — identifies persons, orgs, locations
+- **Question answering** — extractive QA with context
+- **Text summarization** — abstractive summarization
+- **Translation** — EN→FR (default), EN→ES (`Helsinki-NLP/opus-mt-en-es`)
+- **Zero-shot classification** — text categorized into arbitrary labels without training
+- **Text generation** — GPT-2 style open-ended generation
+- **Image generation** — SDXL-Turbo via `AutoPipelineForText2Image`
+- **Audio (TTS)** — speecht5_tts via pipeline
+
+**Custom Lechuteq additions (cells 20–21):**
+- Personal SDXL prompt: *"A warm-dressed cyclist in a black ski jacket riding an orange-black mountain bike in snowy/frosty evening weather, heading to a white cottage office — vibrant pop-art style"*
+- Second personal prompt: *"Python robot extracting data from PDF documents next to office worker — dark pop-art style"*
+
+**Tech stack:** `transformers.pipeline`, `diffusers`, `datasets`, `soundfile`, `torch`.
+
+---
+
+#### Day 3: Tokenizers Deep-Dive
+**Goal:** Understand what actually happens between your Python `messages=[]` dict and the raw text that enters a model — the crucial "aha moment" of the whole course.
+
+**What was explored:**
+- `AutoTokenizer` loaded for **Meta Llama 3.1-8B**
+- `tokenizer.encode()` / `decode()` / `batch_decode()` — encoding text to token IDs and back
+- Vocabulary size (`len(tokenizer.vocab)` = 128,000 for Llama)
+- **Instruct variants** — `Meta-Llama-3.1-8B-Instruct` uses a chat template
+- `tokenizer.apply_chat_template(messages)` — shows the real string that model sees (system/user/assistant tags)
+- **Cross-model tokenizer comparison** across:
+  - Llama 3.1 (Meta) — BPE vocabulary
+  - Phi-4 Mini (`microsoft/Phi-4-mini-instruct`)
+  - DeepSeek V3.1 (`deepseek-ai/DeepSeek-V3.1`)
+  - QwenCoder 2.5 (`Qwen/Qwen2.5-Coder-7B-Instruct`) — code-specific tokenization (tokens per symbol)
+- Each model has different chat template format — key insight for prompt engineering
+
+**Tech stack:** `transformers.AutoTokenizer`, HuggingFace Hub, CPU (no GPU needed).
+
+---
+
+#### Day 4: Models — Lower-Level Transformer API
+**Goal:** Go below the `pipeline()` abstraction and use `AutoModelForCausalLM` directly with tokenization, quantization, and streaming.
+
+**What was built:**
+- **4-bit quantization** with `BitsAndBytesConfig` (`load_in_4bit=True`, `bnb_4bit_quant_type="nf4"`, double quant) — fits large models into T4's 16 GB
+- Loading **Llama 3.2-1B-Instruct** / **Llama 3.1-8B-Instruct** with `device_map="auto"` + quant config
+- Memory footprint reporting: `model.get_memory_footprint()` — verified 4-bit compressed size
+- Inspecting the raw **PyTorch model object** (layers, attention heads, MLP blocks)
+- `model.generate(inputs, max_new_tokens=80)` — raw token generation
+- `TextStreamer` for streaming token-by-token output
+- Reusable `generate(model, messages, quant, max_new_tokens)` helper function
+- Tested multiple models: **Phi** (Microsoft), **Gemma** (Google), **Qwen** (Alibaba), **DeepSeek**
+- Memory cleanup: `del model, inputs; gc.collect(); torch.cuda.empty_cache()`
+
+**Tech stack:** `transformers` (`AutoModelForCausalLM`, `AutoTokenizer`, `TextStreamer`, `BitsAndBytesConfig`), `torch`, `bitsandbytes`, `accelerate`.
+
+---
+
+#### Day 5: Meeting Minutes Product (Audio → Transcription → Structured Report)
+**Goal:** Build a real end-to-end product combining audio transcription + LLM text generation — a "meeting minutes" generator.
+
+**What was built:**
+- Google Drive mount (`drive.mount("/content/drive")`) to access `denver_extract.mp3` (Denver City Council meeting audio)
+- **Step 1 — Transcription** (two options compared):
+  - Option A — Open source: `openai/whisper-medium.en` via HuggingFace pipeline (automatic speech recognition with timestamps)
+  - Option B — Commercial: OpenAI `gpt-4o-mini-transcribe` API
+  - Side-by-side comparison of both transcription outputs
+- **Step 2 — Meeting Minutes Generation:**
+  - System prompt designed to produce structured minutes: summary, key discussion points, takeaways, action items with owners
+  - Used `meta-llama/Llama-3.2-3B-Instruct` with 4-bit quantization + `TextStreamer`
+  - Output rendered in Markdown via `IPython.display`
+
+**Tech stack:** `transformers` (Whisper ASR + Llama), `openai` (Whisper API), `BitsAndBytesConfig`, `google.colab.drive`, `IPython.display`.
+
+---
+
 ### 🛠️ Common Tech Stack (Across All Weeks)
 
 | Category | Libraries |
 |----------|-----------|
 | LLM SDKs | `openai`, `anthropic`, `google-generativeai`, `groq` |
-| Local LLM | `ollama` (running llama3.2) |
+| Local LLM | `ollama` (llama3.2), HuggingFace `transformers` |
+| Open Source Models | Llama 3.1/3.2, Phi-4, Gemma, Qwen, DeepSeek, Whisper |
+| Image Generation | `diffusers` (SDXL-Turbo, SDXL Base+Refiner, FLUX.1-schnell) |
+| Speech | `microsoft/speecht5_tts`, `openai/whisper-medium.en`, `gpt-4o-mini-tts` |
+| Quantization | `bitsandbytes` (4-bit NF4), `accelerate` |
 | UI | `gradio>=5.49` |
 | Web scraping | `beautifulsoup4`, `requests` |
-| Data | `sqlite3` (custom upgrade!), Python dicts |
+| Data | `sqlite3` (custom upgrade!), `datasets==3.6.0` |
 | Display | `IPython.display`, Markdown streaming |
-| Media | `Pillow`, `base64`, `pydub` |
-| Env | `python-dotenv` |
+| Media | `Pillow`, `base64`, `pydub`, `soundfile` |
+| Cloud | Google Colab (T4 GPU free tier, A100 paid) |
+| Env | `python-dotenv`, Colab Secrets (`userdata.get`) |
 | Runtime | Python 3.12, Jupyter Lab 4.5, UV package manager |
 
 ---
@@ -200,10 +309,11 @@ You've already mastered:
 - Tool calling with SQLite → in Week 5 (RAG), you can swap the SQLite tool for a vector store query
 - `gr.Blocks` layout → use this for all complex UIs in Weeks 4–8
 
-#### 2. **Week 3 — Hugging Face & Open Source Models (Colab)**
-- You've already proven Ollama works locally — Week 3 expands to Hugging Face `transformers`
-- **Tip:** Start every Colab notebook with `!pip install -q ...` and a HF token check (you already have `HF_TOKEN` in `.env`)
-- **Save GPU credits:** Use `bitsandbytes` for 8-bit/4-bit quantization on Colab T4
+#### 2. **Week 3 — HuggingFace & Open Source Models (Colab) ✅ DONE**
+- You built the full progression: pipelines → tokenizers → raw models → real product
+- **Key pattern to reuse:** The `generate(model, messages, quant, max_new_tokens)` helper from Day 4 is the standard way to run any HuggingFace causal model — copy it to Week 7 fine-tuning
+- **Quantization matters:** 4-bit NF4 (`BitsAndBytesConfig`) lets 8B-parameter models fit in a T4's 16 GB — always use it on Colab free tier
+- **Whisper vs. commercial:** You compared both transcription options — for production use gpt-4o-mini-transcribe (cleaner output), for private/offline use Whisper
 
 #### 3. **Week 4 — Code Generation**
 - Build on your Brochure Generator pattern: input → multi-step LLM pipeline → output
@@ -242,7 +352,8 @@ You've already mastered:
 ```
 llm_engineering/
 ├── lechuteq/                        # ← Your personal documentation & artifacts
-│   └── LECHUTEQ_README.md           # ← This file
+│   ├── LECHUTEQ_README.md           # ← This file
+│   └── projects/                    # Portfolio standalone projects (Weeks 1-2)
 ├── week1/
 │   ├── day1.ipynb                   # Customized: Polish SME analysis
 │   ├── day2.ipynb                   # Customized: Ollama + Google API
@@ -254,9 +365,14 @@ llm_engineering/
 │   ├── day3.ipynb                   # Chatbot
 │   ├── day4.ipynb                   # SQLite-backed Airline AI (custom!)
 │   ├── day5.ipynb                   # Multimodal assistant
-│   ├── add_example_cell.py          # Custom helper script
 │   ├── image_Sydney.webp            # DALL-E 3 generated artifact
 │   └── image_Warsaw.webp            # DALL-E 3 generated artifact
+├── week3/
+│   ├── Week 3 Day 1 - Colab.ipynb   # Colab setup + diffusers image gen
+│   ├── Week 3 day 2 - pipelines.ipynb  # HF pipeline API (+ 2 custom prompts)
+│   ├── Week 3 Day 3 - tokenizers.ipynb # Tokenizers deep-dive
+│   ├── Week 3 Day 4 - models.ipynb  # AutoModelForCausalLM + 4-bit quant
+│   └── Week 3 Day 5 - Meeting Minutes product.ipynb  # Audio → Whisper → Llama
 └── CLAUDE.md                        # Claude Code guidance file
 ```
 
@@ -266,31 +382,31 @@ llm_engineering/
 
 ## 🇵🇱 WERSJA POLSKA
 
-### ⚠️ Status synchronizacji (2026-05-27)
+### Status synchronizacji (2026-06-19)
 
 **Zgłaszany postęp:** 6 z 8 tygodni ukończonych.
-**Faktycznie obecne w repozytorium GitHub:** Tylko Tydzień 1 + Tydzień 2 (ostatni commit `dea65b19` z 2025-12-20).
-**Brakuje na tej maszynie:** prace z Tygodni 3, 4, 5, 6.
+**Zsynchronizowane z GitHub:** Tygodnie 1, 2, 3 (notebooki Colab z Tygodnia 3 wgrane 2026-06-19).
+**Brakuje na tej maszynie:** prace z Tygodni 4, 5, 6.
 
-Portfolio w [`projects/`](./projects/) odzwierciedla tylko to, co jest obecnie zsynchronizowane z tą maszyną i z GitHubem.
+Portfolio w [`projects/`](./projects/) odzwierciedla Tygodnie 1 i 2.
 
 **Prawdopodobne lokalizacje brakującej pracy (do sprawdzenia w domu):**
 - 🏠 Domowy komputer z Windows 11 — lokalny klon nigdy nie wypchnięty
 - 🏠 Domowy komputer z Ubuntu — inny lokalny klon nigdy nie wypchnięty
-- ☁️ Google Colab — kurs używa Colab dla Tygodni 3 i 7 (praca z GPU). Sprawdź `colab.research.google.com → File → Recent notebooks`
+- ☁️ Google Colab — sprawdź `colab.research.google.com → File → Recent notebooks`
 - 📄 Luźne pliki `.ipynb` w folderach Pobrane / Dokumenty
 
 **Polecenia wyszukiwania:**
 ```bash
 # Linux / macOS / WSL
-find / -name "day*.ipynb" -path "*week[3-8]*" 2>/dev/null
+find / -name "day*.ipynb" -path "*week[4-8]*" 2>/dev/null
 
 # Windows PowerShell
 Get-ChildItem -Path C:\ -Recurse -Filter "day*.ipynb" -ErrorAction SilentlyContinue |
-  Where-Object { $_.FullName -match "week[3-8]" }
+  Where-Object { $_.FullName -match "week[4-8]" }
 ```
 
-**Następne kroki po znalezieniu:** Umieść je w `week3/`, `week4/` itd., zacommituj + wypchnij do origin, i rozszerz portfolio o projekty `05_`, `06_`, … odpowiednio.
+**Następne kroki po znalezieniu:** Umieść je w `week4/`, `week5/` itd., zacommituj + wypchnij do origin, i rozszerz portfolio o projekty `05_`, `06_`, … odpowiednio.
 
 ---
 
@@ -307,7 +423,11 @@ Get-ChildItem -Path C:\ -Recurse -Filter "day*.ipynb" -ErrorAction SilentlyConti
 | 2 | 3 | ✅ Gotowe (zsynchronizowane) | Chatbot konwersacyjny |
 | 2 | 4 | ✅ Gotowe (zsynchronizowane) | Asystent linii lotniczej z narzędziami (SQLite) |
 | 2 | 5 | ✅ Gotowe (zsynchronizowane) | Multimodalny asystent AI |
-| 3 | 1-5 | 🔍 Zrobione gdzie indziej — wymaga synchronizacji | Open Source / Hugging Face / Colab |
+| 3 | 1 | ✅ Gotowe (zsynchronizowane) | Colab + GPU + generowanie obrazów (diffusers) |
+| 3 | 2 | ✅ Gotowe (zsynchronizowane) | Pipelines HuggingFace (wysokopoziomowe API) |
+| 3 | 3 | ✅ Gotowe (zsynchronizowane) | Szczegółowa analiza tokenizatorów |
+| 3 | 4 | ✅ Gotowe (zsynchronizowane) | Niskopoziomowe API modeli + kwantyzacja 4-bit |
+| 3 | 5 | ✅ Gotowe (zsynchronizowane) | Produkt Protokołów ze spotkań (Audio → Whisper → Llama) |
 | 4 | 1-5 | 🔍 Zrobione gdzie indziej — wymaga synchronizacji | Generowanie kodu |
 | 5 | 1-5 | 🔍 Zrobione gdzie indziej — wymaga synchronizacji | RAG (Retrieval Augmented Generation) |
 | 6 | 1-5 | 🔍 Zrobione gdzie indziej — wymaga synchronizacji | Fine-tuning |
@@ -431,18 +551,119 @@ Get-ChildItem -Path C:\ -Recurse -Filter "day*.ipynb" -ErrorAction SilentlyConti
 
 ---
 
+### 🗂️ TYDZIEŃ 3 — Modele Open Source, HuggingFace i Google Colab
+
+Wszystkie notebooki Tygodnia 3 uruchamiały się na **Google Colab** z darmowym GPU Tesla T4 (16 GB VRAM). Token `HF_TOKEN` był dostarczany przez Colab Secrets.
+
+---
+
+#### Dzień 1: Konfiguracja Google Colab + Generatywne modele obrazów
+**Cel:** Pierwsze zetknięcie z Google Colab jako środowiskiem GPU w chmurze i uruchamianie najnowocześniejszych modeli dyfuzji obrazów bez lokalnego sprzętu.
+
+**Co zostało zbudowane:**
+- Sprawdzenie GPU przez `nvidia-smi` potwierdzające połączenie z Tesla T4
+- Logowanie do HuggingFace z `HF_TOKEN` przez Colab Secrets
+- Generowanie obrazów z **SDXL-Turbo** (`stabilityai/sdxl-turbo`) — szybka dyfuzja 4-krokowa
+- Generowanie obrazów z **Stable Diffusion XL Base 1.0**
+- **Pipeline dwóch modeli:** SDXL Base + SDXL Refiner łączone dla wyższej jakości
+- Synteza mowy z `microsoft/speecht5_tts` + osadzenia głośnika z CMU Arctic
+- Pokaz **FLUX.1-schnell** na premium GPU A100 (demo płatnego tierui z szacowaniem kosztów: ~$0.015/run)
+
+**Stack technologiczny:** `diffusers`, `transformers`, `torch`, `datasets`, `soundfile`, `huggingface_hub`, GPU T4 Colab.
+
+---
+
+#### Dzień 2: Pipeline HuggingFace (Wysokopoziomowe API wnioskowania)
+**Cel:** Opanowanie abstrakcji `pipeline()` z HuggingFace — jednego zunifikowanego API dla wielu zadań AI.
+
+**Co zostało zbudowane / zbadane:**
+- **Analiza sentymentu** — model domyślny + `nlptown/bert-base-multilingual-uncased-sentiment` (5 gwiazdek)
+- **NER** — rozpoznawanie osób, organizacji, lokalizacji
+- **Pytania i odpowiedzi** — ekstrakcyjne QA z kontekstem
+- **Podsumowanie tekstu** — streszczenie abstrakcyjne
+- **Tłumaczenie** — EN→FR (domyślne), EN→ES (`Helsinki-NLP/opus-mt-en-es`)
+- **Klasyfikacja zero-shot** — tekst kategoryzowany w dowolne etykiety bez treningu
+- **Generowanie tekstu** — otwarte generowanie w stylu GPT-2
+- **Generowanie obrazów** — SDXL-Turbo przez `AutoPipelineForText2Image`
+- **Audio (TTS)** — speecht5_tts przez pipeline
+
+**Własne dodatki Lechuteq (komórki 20–21):**
+- Osobisty prompt SDXL: *"Ciepło ubrany rowerzysta w czarnej kurtce narciarskiej jadący pomarańczowo-czarnym rowerem górskim w zaśnieżony, mroźny wieczór, kierujący się do swojego biura w białym domku — żywy styl pop-art"*
+- Drugi osobisty prompt: *"Mały robot Python wyciągający dane z dokumentów PDF siedzący obok pracownika biurowego — ciemny styl pop-art"*
+
+**Stack technologiczny:** `transformers.pipeline`, `diffusers`, `datasets`, `soundfile`, `torch`.
+
+---
+
+#### Dzień 3: Szczegółowa analiza tokenizatorów
+**Cel:** Zrozumieć, co faktycznie dzieje się między słownikiem Python `messages=[]` a surowym tekstem wchodzącym do modelu — kluczowy "moment olśnienia" całego kursu.
+
+**Co zostało zbadane:**
+- `AutoTokenizer` załadowany dla **Meta Llama 3.1-8B**
+- `tokenizer.encode()` / `decode()` / `batch_decode()` — kodowanie tekstu na ID tokenów i z powrotem
+- Rozmiar słownika (`len(tokenizer.vocab)` = 128 000 dla Llama)
+- **Warianty Instruct** — `Meta-Llama-3.1-8B-Instruct` używa szablonu czatu
+- `tokenizer.apply_chat_template(messages)` — pokazuje rzeczywisty ciąg znaków, który widzi model
+- **Porównanie tokenizatorów** między modelami: Llama 3.1, Phi-4 Mini, DeepSeek V3.1, QwenCoder 2.5
+- Każdy model ma inny format szablonu czatu — kluczowy wgląd dla inżynierii promptów
+
+**Stack technologiczny:** `transformers.AutoTokenizer`, HuggingFace Hub, CPU (bez GPU).
+
+---
+
+#### Dzień 4: Modele — Niskopoziomowe API Transformera
+**Cel:** Zejść poniżej abstrakcji `pipeline()` i używać bezpośrednio `AutoModelForCausalLM` z tokenizacją, kwantyzacją i strumieniowaniem.
+
+**Co zostało zbudowane:**
+- **Kwantyzacja 4-bit** z `BitsAndBytesConfig` (`load_in_4bit=True`, `bnb_4bit_quant_type="nf4"`, podwójna kwantyzacja) — mieści duże modele w 16 GB T4
+- Ładowanie **Llama 3.2-1B-Instruct** / **Llama 3.1-8B-Instruct** z `device_map="auto"` + konfiguracją kwant
+- Raportowanie śladu pamięci: `model.get_memory_footprint()` — weryfikacja skompresowanego rozmiaru 4-bit
+- Inspekcja surowego **obiektu modelu PyTorch** (warstwy, głowice uwagi, bloki MLP)
+- `model.generate(inputs, max_new_tokens=80)` — surowe generowanie tokenów
+- `TextStreamer` dla strumieniowania token po tokenie
+- Wielokrotnie używalna funkcja pomocnicza `generate(model, messages, quant, max_new_tokens)`
+- Testowane modele: **Phi** (Microsoft), **Gemma** (Google), **Qwen** (Alibaba), **DeepSeek**
+- Czyszczenie pamięci: `del model, inputs; gc.collect(); torch.cuda.empty_cache()`
+
+**Stack technologiczny:** `transformers` (`AutoModelForCausalLM`, `AutoTokenizer`, `TextStreamer`, `BitsAndBytesConfig`), `torch`, `bitsandbytes`, `accelerate`.
+
+---
+
+#### Dzień 5: Produkt Protokołów ze spotkań (Audio → Transkrypcja → Raport)
+**Cel:** Zbudowanie realnego produktu end-to-end łączącego transkrypcję audio + generowanie tekstu LLM — generator protokołów ze spotkań.
+
+**Co zostało zbudowane:**
+- Montowanie Google Drive (`drive.mount("/content/drive")`) do dostępu do `denver_extract.mp3` (audio ze spotkania Rady Miejskiej Denver)
+- **Krok 1 — Transkrypcja** (porównano dwie opcje):
+  - Opcja A — Open source: `openai/whisper-medium.en` przez pipeline HuggingFace (automatyczne rozpoznawanie mowy ze znacznikami czasu)
+  - Opcja B — Komercyjne: OpenAI API `gpt-4o-mini-transcribe`
+  - Porównanie wyników obu transkrypcji obok siebie
+- **Krok 2 — Generowanie protokołów:**
+  - Prompt systemowy zaprojektowany do tworzenia ustrukturyzowanych protokołów: podsumowanie, kluczowe punkty, wnioski, zadania z właścicielami
+  - Użyto `meta-llama/Llama-3.2-3B-Instruct` z kwantyzacją 4-bit + `TextStreamer`
+  - Wynik renderowany w Markdown przez `IPython.display`
+
+**Stack technologiczny:** `transformers` (Whisper ASR + Llama), `openai` (Whisper API), `BitsAndBytesConfig`, `google.colab.drive`, `IPython.display`.
+
+---
+
 ### 🛠️ Wspólny Stack Technologiczny (Wszystkie tygodnie)
 
 | Kategoria | Biblioteki |
 |-----------|------------|
 | SDK LLM | `openai`, `anthropic`, `google-generativeai`, `groq` |
-| Lokalny LLM | `ollama` (działa llama3.2) |
+| Lokalny LLM | `ollama` (llama3.2), HuggingFace `transformers` |
+| Modele open source | Llama 3.1/3.2, Phi-4, Gemma, Qwen, DeepSeek, Whisper |
+| Generowanie obrazów | `diffusers` (SDXL-Turbo, SDXL Base+Refiner, FLUX.1-schnell) |
+| Mowa | `microsoft/speecht5_tts`, `openai/whisper-medium.en`, `gpt-4o-mini-tts` |
+| Kwantyzacja | `bitsandbytes` (4-bit NF4), `accelerate` |
 | UI | `gradio>=5.49` |
 | Web scraping | `beautifulsoup4`, `requests` |
-| Dane | `sqlite3` (własne usprawnienie!), słowniki Python |
+| Dane | `sqlite3` (własne usprawnienie!), `datasets==3.6.0` |
 | Wyświetlanie | `IPython.display`, strumieniowanie Markdown |
-| Media | `Pillow`, `base64`, `pydub` |
-| Środowisko | `python-dotenv` |
+| Media | `Pillow`, `base64`, `pydub`, `soundfile` |
+| Chmura | Google Colab (darmowy T4 GPU, płatny A100) |
+| Środowisko | `python-dotenv`, Colab Secrets (`userdata.get`) |
 | Runtime | Python 3.12, Jupyter Lab 4.5, menedżer pakietów UV |
 
 ---
@@ -457,10 +678,11 @@ Już opanowałeś:
 - Wywoływanie narzędzi z SQLite → w Tygodniu 5 (RAG) możesz zamienić narzędzie SQLite na zapytanie do bazy wektorowej
 - Layout `gr.Blocks` → używaj tego dla wszystkich złożonych UI w Tygodniach 4–8
 
-#### 2. **Tydzień 3 — Hugging Face i modele Open Source (Colab)**
-- Już udowodniłeś, że Ollama działa lokalnie — Tydzień 3 rozszerza to o Hugging Face `transformers`
-- **Wskazówka:** Zaczynaj każdy notebook w Colab od `!pip install -q ...` i sprawdzenia tokena HF (masz już `HF_TOKEN` w `.env`)
-- **Oszczędzanie kredytów GPU:** Użyj `bitsandbytes` dla kwantyzacji 8-bit/4-bit na Colab T4
+#### 2. **Tydzień 3 — HuggingFace i modele Open Source (Colab) ✅ UKOŃCZONE**
+- Zbudowałeś pełną progresję: pipelines → tokenizatory → surowe modele → realny produkt
+- **Kluczowy wzorzec do ponownego użycia:** Funkcja pomocnicza `generate(model, messages, quant, max_new_tokens)` z Dnia 4 to standardowy sposób uruchamiania dowolnego kauzalnego modelu HuggingFace — skopiuj ją do fine-tuningu w Tygodniu 7
+- **Kwantyzacja ma znaczenie:** 4-bit NF4 (`BitsAndBytesConfig`) pozwala modelom 8B parametrów zmieścić się w 16 GB T4 — zawsze używaj na darmowym tierze Colab
+- **Whisper vs. komercyjne:** Porównałeś obie opcje transkrypcji — dla produkcji użyj gpt-4o-mini-transcribe (czystszy wynik), dla trybu prywatnego/offline użyj Whisper
 
 #### 3. **Tydzień 4 — Generowanie kodu**
 - Bazuj na wzorcu Generatora Broszury: input → wieloetapowy pipeline LLM → output
@@ -528,4 +750,5 @@ llm_engineering/
 
 ---
 
-*Dokument przygotowany: 27 maja 2026 | Document prepared: May 27, 2026*
+*Dokument przygotowany: 27 maja 2026 | Zaktualizowany: 19 czerwca 2026 (Tydzień 3 dodany)*
+*Document prepared: May 27, 2026 | Updated: June 19, 2026 (Week 3 added)*

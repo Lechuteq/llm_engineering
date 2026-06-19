@@ -55,7 +55,10 @@ Get-ChildItem -Path C:\ -Recurse -Filter "day*.ipynb" -ErrorAction SilentlyConti
 | 3 | 3 | ✅ Done (synced) | Tokenizers deep-dive |
 | 3 | 4 | ✅ Done (synced) | Models lower-level API + 4-bit quantization |
 | 3 | 5 | ✅ Done (synced) | Meeting Minutes product (Audio → Whisper → Llama) |
-| 4 | 1-5 | 🔍 Done elsewhere — needs sync | Code Generation |
+| 4 | 1-2 | 🔍 Missing — not on this machine | Code Generation (intro) |
+| 4 | 3 | ✅ Done (synced) | Python → C++ with frontier models (4-way comparison) |
+| 4 | 4 | ✅ Done (synced) | Gradio UI + 9-model benchmark |
+| 4 | 5 | ✅ Done (synced) | Python → Rust extension + harder benchmark |
 | 5 | 1-5 | 🔍 Done elsewhere — needs sync | RAG (Retrieval Augmented Generation) |
 | 6 | 1-5 | 🔍 Done elsewhere — needs sync | Fine-tuning |
 | 7 | 1-5 | ✅ Done (synced) | QLoRA fine-tuning + model evaluation (Colab GPU) |
@@ -385,6 +388,90 @@ DealAgentFramework
 
 ---
 
+### 🗂️ WEEK 4 — Code Generation: Python → C++ / Rust
+
+Use frontier LLMs to translate Python code into high-performance compiled languages (C++ and Rust), benchmark the results, and wrap everything in a Gradio UI.
+
+> **Note:** Days 1 & 2 notebooks are not on this machine — missing from sync. Days 3–5 are present.
+
+---
+
+#### Day 3: Python → C++ Code Generator (4-Model Comparison)
+**Goal:** Build a code conversion tool that translates Python into optimized C++ and actually benchmark the speedup on a real computation.
+
+**What was built:**
+- `system_info.py` — detects machine OS, CPU, and available C++ compiler, then asks GPT to provide the right compile command for the host system
+- Compile pipeline: `clang++` with maximum optimizations (`-Ofast -mcpu=native -flto=thin -DNDEBUG`) → native binary
+- System prompt: *"convert Python to high-performance C++, respond only with code"*
+- `port(client, model, python)` → strips markdown fences, writes `main.cpp`, compiles and runs
+- Benchmark: π calculation with 200,000,000 iterations — Python baseline **~19.18 seconds**
+
+**4-model benchmark results:**
+
+| Place | Model | Time (s) | Speedup |
+|-------|-------|----------|---------|
+| 4th | Claude Sonnet 4.5 | 0.104 | ~184× |
+| 3rd | GPT-5 | 0.082 | ~233× |
+| 2nd | Grok 4 | 0.018 | ~1,060× |
+| 1st | Gemini 2.5 Pro | 0.013 | **~1,440×** |
+
+**Tech stack:** `openai`, `anthropic`, `subprocess` (compile + run), `system_info.py`.
+
+---
+
+#### Day 4: Gradio UI + 9-Model Expanded Benchmark
+**Goal:** Add a Gradio UI for interactive Python→C++ conversion with any model, and expand the competition to 9 models including open-source alternatives.
+
+**What was built:**
+- `gr.Blocks` UI: Python code editor (left) → C++ output (right), model dropdown selector, Convert button
+- Extended model roster with 9 models across 6 providers:
+  - Frontier: GPT-5, Claude Sonnet 4.5, Grok 4, Gemini 2.5 Pro
+  - Open source via Groq/OpenRouter: `openai/gpt-oss-120b`, `gpt-oss:20b`
+  - Code-specialized: Qwen 2.5 Coder (Ollama), DeepSeek Coder v2 (Ollama), Qwen3 Coder 30B (OpenRouter)
+- `port(model, python)` refactored to use `clients[model]` dispatch dict
+- `reasoning_effort="high"` applied selectively for GPT models
+
+**9-model benchmark results (same π benchmark):**
+
+| Place | Model | Speedup |
+|-------|-------|---------|
+| 9th | Qwen 2.5 Coder | FAIL |
+| 8th | OpenAI gpt-oss-120B | 14× |
+| 7th | DeepSeek Coder v2 | 168× |
+| 6th | Qwen3 Coder 30B | 168× |
+| 5th | Claude Sonnet 4.5 | 184× |
+| 4th | GPT-5 | 233× |
+| 3rd | gpt-oss-20B | 238× |
+| 2nd | Grok 4 | 1,060× |
+| 1st | Gemini 2.5 Pro | **1,440×** |
+
+**Tech stack:** `gradio` (`gr.Blocks`, `gr.Dropdown`, `gr.Textbox`), all 6 provider clients.
+
+---
+
+#### Day 5: Rust Extension + Harder Benchmark + Styled UI
+**Goal:** Extend the code generator to target Rust (not just C++), add a harder algorithmic benchmark, and polish the Gradio UI.
+
+**What was built:**
+- `language = "Rust"` / `"C++"` toggle — system prompt and file extension adapt automatically
+- Rust compile pipeline: `rustc -C opt-level=3 -C target-cpu=native -C lto=fat -C panic=abort -C strip=symbols`
+- **Harder benchmark:** max subarray sum with LCG (Linear Congruential Generator) random numbers — requires 64-bit integer arithmetic support (many models failed this)
+- `styles.py` CSS + `gr.themes.Monochrome()` + `gr.Code` with syntax highlighting (Python/C++/Rust)
+- `compile_and_run(code)` now returns output string (piped back into Gradio)
+
+**Harder benchmark results (most models failed):**
+
+| Place | Model | Time (s) | Speedup vs Python |
+|-------|-------|----------|-------------------|
+| FAIL | Qwen 2.5 Coder, Gemini 2.5 Pro, DeepSeek Coder v2, Qwen3 30B, Claude Sonnet 4.5, GPT-5 | — | — |
+| 3rd | gpt-oss-20B | 0.000341 | ~99,000× |
+| 2nd | Grok 4 | 0.000317 | ~106,000× |
+| 1st | OpenAI gpt-oss-120B | 0.000304 | **~110,000×** |
+
+**Tech stack:** `gradio` (`gr.Code`, `gr.themes.Monochrome`), `styles.py`, `rustc`, `subprocess`.
+
+---
+
 ### 🗂️ WEEK 7 — Fine-tuning with QLoRA: "The Price is Right"
 
 Fine-tune **Llama 3.2-3B** on 400,000 Amazon product descriptions to predict product prices from text — and beat every frontier model including GPT-5.1.
@@ -512,9 +599,11 @@ You've already mastered:
 - **Quantization matters:** 4-bit NF4 (`BitsAndBytesConfig`) lets 8B-parameter models fit in a T4's 16 GB — always use it on Colab free tier
 - **Whisper vs. commercial:** You compared both transcription options — for production use gpt-4o-mini-transcribe (cleaner output), for private/offline use Whisper
 
-#### 3. **Week 4 — Code Generation**
-- Build on your Brochure Generator pattern: input → multi-step LLM pipeline → output
-- **Tip:** Use the SAME multi-step approach you used in Week 1 Day 5 (link curator → assembler)
+#### 3. **Week 4 — Code Generation ✅ DONE (Days 3–5)**
+- Gemini 2.5 Pro won the C++ benchmark (1,440× speedup); gpt-oss-120B won the harder Rust benchmark (110,000×)
+- **Key insight:** `reasoning_effort="high"` matters for code generation — apply it selectively to GPT models
+- **The provider dispatch dict pattern** (`clients[model]`) is clean and reusable — generalizes to any multi-provider comparison
+- Days 1–2 still missing from this machine — find on Win11/Ubuntu
 
 #### 4. **Week 5 — RAG (Retrieval Augmented Generation)**
 - ChromaDB + LangChain are already installed
@@ -640,7 +729,10 @@ Get-ChildItem -Path C:\ -Recurse -Filter "day*.ipynb" -ErrorAction SilentlyConti
 | 3 | 3 | ✅ Gotowe (zsynchronizowane) | Szczegółowa analiza tokenizatorów |
 | 3 | 4 | ✅ Gotowe (zsynchronizowane) | Niskopoziomowe API modeli + kwantyzacja 4-bit |
 | 3 | 5 | ✅ Gotowe (zsynchronizowane) | Produkt Protokołów ze spotkań (Audio → Whisper → Llama) |
-| 4 | 1-5 | 🔍 Zrobione gdzie indziej — wymaga synchronizacji | Generowanie kodu |
+| 4 | 1-2 | 🔍 Brak — nie na tej maszynie | Generowanie kodu (wprowadzenie) |
+| 4 | 3 | ✅ Gotowe (zsynchronizowane) | Python → C++ z modelami frontier (porównanie 4 modeli) |
+| 4 | 4 | ✅ Gotowe (zsynchronizowane) | UI Gradio + benchmark 9 modeli |
+| 4 | 5 | ✅ Gotowe (zsynchronizowane) | Rozszerzenie Python → Rust + trudniejszy benchmark |
 | 5 | 1-5 | 🔍 Zrobione gdzie indziej — wymaga synchronizacji | RAG (Retrieval Augmented Generation) |
 | 6 | 1-5 | 🔍 Zrobione gdzie indziej — wymaga synchronizacji | Fine-tuning |
 | 7 | 1-5 | ✅ Gotowe (zsynchronizowane) | Fine-tuning QLoRA + ewaluacja modelu (Colab GPU) |
@@ -860,6 +952,73 @@ Wszystkie notebooki Tygodnia 3 uruchamiały się na **Google Colab** z darmowym 
   - Wynik renderowany w Markdown przez `IPython.display`
 
 **Stack technologiczny:** `transformers` (Whisper ASR + Llama), `openai` (Whisper API), `BitsAndBytesConfig`, `google.colab.drive`, `IPython.display`.
+
+---
+
+### 🗂️ TYDZIEŃ 4 — Generowanie kodu: Python → C++ / Rust
+
+Używanie modeli frontier LLM do tłumaczenia kodu Python na wysokowydajne języki kompilowane (C++ i Rust), benchmarkowanie wyników i owijanie wszystkiego w UI Gradio.
+
+> **Uwaga:** Notebooki Dni 1 i 2 nie są na tej maszynie — brakuje synchronizacji. Dni 3–5 są dostępne.
+
+---
+
+#### Dzień 3: Generator kodu Python → C++ (porównanie 4 modeli)
+**Cel:** Zbudowanie narzędzia do konwersji kodu, które tłumaczy Python na zoptymalizowany C++ i benchmarkuje przyspieszenie na rzeczywistych obliczeniach.
+
+**Co zostało zbudowane:**
+- `system_info.py` — wykrywa system operacyjny, CPU i dostępny kompilator C++
+- Pipeline kompilacji: `clang++` z maksymalnymi optymalizacjami (`-Ofast -mcpu=native -flto=thin`)
+- Prompt systemowy: *"przekonwertuj Python na wysokowydajny C++, odpowiadaj tylko kodem"*
+- Benchmark: obliczanie π z 200 000 000 iteracjami — baseline Python: **~19,18 sekundy**
+
+**Wyniki benchmarku (4 modele):**
+
+| Miejsce | Model | Czas (s) | Przyspieszenie |
+|---------|-------|----------|----------------|
+| 4 | Claude Sonnet 4.5 | 0,104 | ~184× |
+| 3 | GPT-5 | 0,082 | ~233× |
+| 2 | Grok 4 | 0,018 | ~1 060× |
+| 1 | Gemini 2.5 Pro | 0,013 | **~1 440×** |
+
+---
+
+#### Dzień 4: UI Gradio + rozszerzony benchmark 9 modeli
+**Cel:** Dodanie UI Gradio do interaktywnej konwersji Python→C++ z dowolnym modelem i rozszerzenie konkurencji do 9 modeli.
+
+**Co zostało zbudowane:**
+- UI `gr.Blocks`: edytor kodu Python (lewo) → wyjście C++ (prawo), dropdown wyboru modelu
+- 9 modeli z 6 dostawców: frontier (GPT-5, Claude, Grok, Gemini) + open source (Qwen, DeepSeek, gpt-oss)
+- Wzorzec słownika `clients[model]` do wywoływania właściwego dostawcy
+
+**Wyniki (ten sam benchmark π):**
+
+| Miejsce | Model | Przyspieszenie |
+|---------|-------|----------------|
+| 1 | Gemini 2.5 Pro | **1 440×** |
+| 2 | Grok 4 | 1 060× |
+| 3 | gpt-oss-20B | 238× |
+| 9 | Qwen 2.5 Coder | FAIL |
+
+---
+
+#### Dzień 5: Rozszerzenie Rust + trudniejszy benchmark + stylizowane UI
+**Cel:** Rozszerzenie generatora kodu o Rust, dodanie trudniejszego benchmarku i dopracowanie UI Gradio.
+
+**Co zostało zbudowane:**
+- Przełącznik `language = "Rust"` / `"C++"` — prompt i rozszerzenie pliku dostosowują się automatycznie
+- Pipeline kompilacji Rust: `rustc -C opt-level=3 -C target-cpu=native -C lto=fat -C panic=abort`
+- **Trudniejszy benchmark:** suma podtablicy maksymalnej z generatorem LCG (wymagana obsługa dużych liczb) — wiele modeli FAILED
+- `styles.py` CSS + `gr.themes.Monochrome()` + `gr.Code` z podświetlaniem składni
+
+**Wyniki trudniejszego benchmarku:**
+
+| Miejsce | Model | Przyspieszenie vs Python |
+|---------|-------|--------------------------|
+| FAIL | Gemini, Claude, GPT-5, DeepSeek, Qwen... | — |
+| 3 | gpt-oss-20B | ~99 000× |
+| 2 | Grok 4 | ~106 000× |
+| 1 | OpenAI gpt-oss-120B | **~110 000×** |
 
 ---
 
@@ -1131,5 +1290,5 @@ llm_engineering/
 
 ---
 
-*Dokument przygotowany: 27 maja 2026 | Zaktualizowany: 19 czerwca 2026 (Tygodnie 3, 7 i 8 dodane)*
-*Document prepared: May 27, 2026 | Updated: June 19, 2026 (Weeks 3, 7 and 8 added)*
+*Dokument przygotowany: 27 maja 2026 | Zaktualizowany: 19 czerwca 2026 (Tygodnie 3, 4, 7 i 8 dodane)*
+*Document prepared: May 27, 2026 | Updated: June 19, 2026 (Weeks 3, 4, 7 and 8 added)*

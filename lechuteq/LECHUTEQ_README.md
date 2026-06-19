@@ -59,8 +59,16 @@ Get-ChildItem -Path C:\ -Recurse -Filter "day*.ipynb" -ErrorAction SilentlyConti
 | 4 | 3 | ✅ Done (synced) | Python → C++ with frontier models (4-way comparison) |
 | 4 | 4 | ✅ Done (synced) | Gradio UI + 9-model benchmark |
 | 4 | 5 | ✅ Done (synced) | Python → Rust extension + harder benchmark |
-| 5 | 1-5 | 🔍 Done elsewhere — needs sync | RAG (Retrieval Augmented Generation) |
-| 6 | 1-5 | 🔍 Done elsewhere — needs sync | Fine-tuning |
+| 5 | 1 | ✅ Done (synced) | Keyword-based RAG — InsureLLM knowledge worker |
+| 5 | 2 | ✅ Done (synced) | LangChain + ChromaDB vector store + t-SNE visualization |
+| 5 | 3 | ✅ Done (synced) | LangChain RAG pipeline + Gradio chatbot |
+| 5 | 4 | ✅ Done (synced) | RAG evaluation framework (accuracy/completeness/relevance) |
+| 5 | 5 | ✅ Done (synced) | Advanced RAG: LLM chunking + reranking + query rewriting |
+| 6 | 1 | ✅ Done (synced) | Data curation — 820k Amazon product scrape |
+| 6 | 2 | ✅ Done (synced) | Data pre-processing — LLM summarization via Groq Batch API |
+| 6 | 3 | ✅ Done (synced) | Baseline models — Linear Regression, Random Forest, XGBoost |
+| 6 | 4 | ✅ Done (synced) | Neural network + frontier model benchmarking |
+| 6 | 5 | ✅ Done (synced) | OpenAI fine-tuning (GPT-4.1-nano) |
 | 7 | 1-5 | ✅ Done (synced) | QLoRA fine-tuning + model evaluation (Colab GPU) |
 | 8 | 1 | ✅ Done (synced) | Modal.com cloud deployment + SpecialistAgent |
 | 8 | 2 | ✅ Done (synced) | RAG vector store + FrontierAgent + EnsembleAgent |
@@ -472,6 +480,185 @@ Use frontier LLMs to translate Python code into high-performance compiled langua
 
 ---
 
+### 🗂️ WEEK 5 — RAG: Expert Knowledge Worker for InsureLLM
+
+Build a question-answering assistant for a fictional insurance tech company (InsureLLM) using a knowledge base of employee profiles, product sheets, and contracts — progressing from naive keyword matching to advanced RAG with reranking and query rewriting.
+
+---
+
+#### Day 1: Keyword-Based RAG (Baseline)
+**Goal:** Build the simplest possible RAG — no vectors, just keyword lookup — to establish a working chatbot before introducing complexity.
+
+**What was built:**
+- Loaded all knowledge-base `.md` files (employees, products, contracts) into a Python dict keyed by last name / product name
+- `get_relevant_context(message)` — splits user message into words, looks each up in the dict → returns matching documents
+- `additional_context(message)` — wraps context into a formatted string injected into the system prompt
+- Full `chat(message, history)` function using `gpt-4.1-nano` (cost-optimized choice)
+- Launched as `gr.ChatInterface` — working chatbot in one screen of code
+
+**Tech stack:** `openai` (`gpt-4.1-nano`), `glob`, `pathlib`, `gradio`.
+
+---
+
+#### Day 2: LangChain + ChromaDB Vector Store + t-SNE Visualization
+**Goal:** Replace keyword lookup with semantic vector search — chunk documents, embed them, store in ChromaDB, and visualize the embedding space.
+
+**What was built:**
+- `tiktoken` token count analysis of the full knowledge base
+- LangChain `DirectoryLoader` + `TextLoader` to load all `.md` files with `doc_type` metadata
+- `RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)` — divided documents into chunks
+- Two embedding options compared:
+  - `HuggingFaceEmbeddings("all-MiniLM-L6-v2")` — free, local, 384 dimensions
+  - `OpenAIEmbeddings("text-embedding-3-large")` — paid, higher quality
+- `Chroma.from_documents()` — populated persistent vector store (`vector_db/`)
+- t-SNE 2D and 3D scatter plots (Plotly) — visualized how document types cluster in embedding space
+
+**Tech stack:** `langchain-openai`, `langchain-chroma`, `langchain-huggingface`, `langchain-community`, `tiktoken`, `chromadb`, `sklearn` (t-SNE), `plotly`, `numpy`.
+
+---
+
+#### Day 3: LangChain RAG Pipeline + Gradio Chatbot
+**Goal:** Wire the vector store into a full LangChain RAG pipeline with a one-function Gradio chatbot.
+
+**What was built:**
+- `vectorstore.as_retriever()` — LangChain retriever over the ChromaDB store
+- `ChatOpenAI(temperature=0, model_name="gpt-4.1-nano")` — deterministic answers
+- `retriever.invoke(question)` + `llm.invoke(...)` — demonstrated both objects independently
+- `answer_question(question, history)` — retrieves docs, formats context, calls LLM via `SystemMessage` + `HumanMessage`
+- `gr.ChatInterface(answer_question).launch()` — full chatbot in 3 lines
+
+**Tech stack:** `langchain-openai` (`ChatOpenAI`), `langchain-chroma`, `langchain-core`, `gradio`.
+
+---
+
+#### Day 4: RAG Evaluation Framework
+**Goal:** Measure RAG quality systematically — not just "does it answer", but accuracy, completeness, and relevance scored by an LLM judge.
+
+**What was built:**
+- `evaluation/tests.jsonl` — test suite with questions, reference answers, categories, and expected keywords
+- `evaluate_retrieval(example)` — checks whether the retrieved chunks actually contain relevant content
+- `evaluate_answer(example)` — calls an LLM judge that scores the answer on:
+  - `accuracy` — factual correctness
+  - `completeness` — covers all required points
+  - `relevance` — stays on topic
+- `eval.feedback` — natural language explanation of the score
+- Category breakdown via `Counter` — identifies which question types the RAG struggles with
+
+**Tech stack:** `evaluation/` package, `langchain`, custom Pydantic evaluation models.
+
+---
+
+#### Day 5: Advanced RAG — LLM Chunking + Reranking + Query Rewriting
+**Goal:** Replace every LangChain abstraction with a custom implementation and add three advanced techniques to significantly improve retrieval quality.
+
+**What was built:**
+- **LLM-driven chunking** (no LangChain): LLM reads each document and produces structured `Chunk` objects (`headline`, `summary`, `content`) using Pydantic + `response_format` — semantically meaningful chunks instead of fixed character splits
+- **OpenAI embeddings** (`text-embedding-3-large`) stored in ChromaDB (`pro_implementation/`)
+- **Reranking:** retrieved top-K chunks are re-ordered by a second LLM call that scores relevance — surfaces buried results (`RankOrder` Pydantic model)
+- **Query rewriting:** user's question is rewritten by an LLM to be more specific and more likely to surface relevant content before hitting the vector store
+- t-SNE visualization of the pro chunk embeddings (richer clusters than Day 2)
+- Final `answer_question(question, history)` pipeline: rewrite → fetch → rerank → generate
+
+**Tech stack:** `openai` (embeddings + chat), `chromadb` (native, no LangChain), `pydantic`, `litellm`, `sklearn` (t-SNE), `plotly`, `tqdm`.
+
+---
+
+### 🗂️ WEEK 6 — "The Price is Right": Data Preparation + Classical ML + Neural Networks
+
+Build a product price predictor from scratch using 820,000 scraped Amazon product descriptions. This week establishes all the training data and baseline models that Weeks 7 and 8 build on.
+
+---
+
+#### Day 1: Data Curation — 820k Amazon Product Scrape
+**Goal:** Acquire, clean, and curate a large real-world dataset from multiple Amazon product categories — learning data engineering at scale.
+
+**What was built:**
+- Loaded 8 Amazon product categories from `McAuley-Lab/Amazon-Reviews-2023` HuggingFace dataset
+- `Item` class — parses each product into title, price, category, weight, and description text
+- Price filter: $1–$1,000 range; description length/quality filter to remove poor entries
+- Distribution analysis (matplotlib): price histograms, character length histograms, price vs. weight scatter plots
+- **Stratified sampling**: 820,000-item final dataset sampled with price-weighted probability (squares prices to avoid over-weighting cheap items), with Tools/Automotive categories down-sampled
+- Deduplication by title and full text
+- 80/10/10 train/val/test split — pushed to `ed-donner/items_raw_lite` and `items_raw_full` on HuggingFace Hub
+
+**Tech stack:** `datasets` (HuggingFace), `pricer/items.py`, `pricer/loaders.py`, `matplotlib`, `numpy`, `tqdm`.
+
+---
+
+#### Day 2: Data Pre-processing — LLM Summarization via Groq Batch API
+**Goal:** Clean and rewrite 820k raw Amazon product descriptions into concise, structured summaries using LLM batch processing (at < $1 for Lite, ~$30 for Full).
+
+**What was built:**
+- System prompt designed to rewrite product descriptions into a fixed 5-field format: Title, Category, Brand, Description (1 sentence), Details (1 sentence)
+- Tested two models for summarization: `groq/openai/gpt-oss-20b` and local `ollama/llama3.2`
+- **Groq Batch API**: built JSONL files (1,000 items/file), uploaded via `groq.files.create()`, submitted via `groq.batches.create()`, polled and downloaded results
+- `Batch` class — wraps the entire create/run/fetch lifecycle with progress tracking
+- Final summarized dataset pushed to HuggingFace Hub as `items_lite` / `items_full`
+
+**Tech stack:** `litellm`, `groq` (Batch API), `pricer/batch.py`, `json`, HuggingFace Hub.
+
+---
+
+#### Day 3: Baselines + Traditional ML Models
+**Goal:** Establish evaluation metrics and build a progression of classical ML models as price predictors.
+
+**What was built:**
+- `evaluate(pricer_fn, test)` — RMSE-based evaluation function (lower = better)
+- Baseline models:
+  - `random_pricer` — random $1–$1,000 (sanity check)
+  - `constant_pricer` — always predicts training mean (~$106)
+  - **Linear Regression** on 3 numeric features: weight, weight_unknown flag, text_length — RMSE 101.56
+  - **NLP + Linear Regression**: `CountVectorizer(max_features=2000)` bag-of-words → RMSE 76.81
+  - **Random Forest** (100 trees, n_jobs=4) on same BoW features — RMSE 72.28
+  - **XGBoost** (1000 trees, gradient boosting) — RMSE 68.23
+
+**Tech stack:** `scikit-learn` (LR, RF, `CountVectorizer`), `xgboost`, `pandas`, `numpy`.
+
+---
+
+#### Day 4: Neural Network from Scratch + Frontier Model Benchmarking
+**Goal:** Build a custom PyTorch neural network and pit it against frontier LLMs — zero-shot, no training.
+
+**What was built:**
+- **Human benchmark**: exported 100 test items to CSV, had a human price them — RMSE 87.62 (worse than XGBoost!)
+- **8-layer PyTorch Neural Network** (`HashingVectorizer` 5,000 BoW features → 128 → 64 → 32 → 16 → 8 → 4 → 1):
+  - Adam optimizer, MSE loss, 2 epochs — RMSE 63.97
+- **Frontier model benchmarking** (zero-shot pricing, no training):
+  - `gpt-4.1-nano`: RMSE 62.51
+  - `claude-opus-4-5`: evaluated
+  - `gemini-3-pro-preview`: RMSE 50.54
+  - `gemini-2.5-flash-lite`: evaluated
+  - `grok-4-1-fast`: RMSE 57.62
+  - `gpt-5.1` (`reasoning_effort="high"`): RMSE **44.74** (best so far)
+- All frontier model calls via `litellm.completion()` with parallel workers
+
+**Tech stack:** `torch`, `torch.nn`, `torch.optim`, `sklearn` (`HashingVectorizer`, `train_test_split`), `litellm`, `csv`.
+
+---
+
+#### Day 5: OpenAI Fine-tuning (GPT-4.1-nano)
+**Goal:** Fine-tune `gpt-4.1-nano` on the Amazon pricing dataset and measure improvement over the base model.
+
+**What was built:**
+- JSONL prompt format: `user` → product summary, `assistant` → `$price` — uploaded to OpenAI Files API
+- `openai.fine_tuning.jobs.create()` with `gpt-4.1-nano-2025-04-14`, `n_epochs=1`, `suffix="pricer"`
+- Polled job status via `openai.fine_tuning.jobs.retrieve()` and `list_events()`
+- Tested fine-tuned model with `max_tokens=7` (only needs to output a number)
+- **Results by training size**:
+  - 100 examples → RMSE 96.58 (barely better than base)
+  - 200 examples → RMSE 79.29
+  - 2,000 examples → RMSE 82.26
+  - **20,000 examples → RMSE 67.75** (matches Random Forest territory)
+
+**Bonus — Deep Neural Network (Optional Extra):**
+- `pricer/deep_neural_network.py` — larger, more expressive network trained for 5 epochs on the full 800k dataset (~4 hours on M1 Mac GPU)
+- Pre-trained weights downloadable from Google Drive (`deep_neural_network.pth`)
+- RMSE **46.49** — competitive with frontier models, used in Week 8 EnsembleAgent
+
+**Tech stack:** `openai` (Files API, Fine-tuning API), `torch` (deep neural network), HuggingFace Hub.
+
+---
+
 ### 🗂️ WEEK 7 — Fine-tuning with QLoRA: "The Price is Right"
 
 Fine-tune **Llama 3.2-3B** on 400,000 Amazon product descriptions to predict product prices from text — and beat every frontier model including GPT-5.1.
@@ -605,10 +792,10 @@ You've already mastered:
 - **The provider dispatch dict pattern** (`clients[model]`) is clean and reusable — generalizes to any multi-provider comparison
 - Days 1–2 still missing from this machine — find on Win11/Ubuntu
 
-#### 4. **Week 5 — RAG (Retrieval Augmented Generation)**
-- ChromaDB + LangChain are already installed
-- **Tip:** Your knowledge-base could be a personal collection (e.g., Polish business/legal documents — building on your Day 1 SME analysis use case)
-- Connect the RAG pipeline to a Gradio UI like you did in Week 2 Day 4–5
+#### 4. **Week 5 — RAG ✅ DONE**
+- The progression Day 1→5 is the cleanest learning arc in the course: keyword dict → LangChain → raw ChromaDB + reranking + query rewriting
+- **Key reusable pattern:** Day 5's `rewrite → fetch → rerank → generate` pipeline is production-grade RAG — use it in any future knowledge-base project
+- **LLM chunking beats fixed-size chunking:** semantic chunks (Day 5) produce much richer t-SNE clusters than character splits (Day 2)
 
 #### 5. **Week 6–7 — Fine-tuning ✅ DONE**
 - Your fine-tuned full model (39.85 RMSE) beat GPT-5.1 (44.74) — the headline result of the whole course
@@ -733,8 +920,16 @@ Get-ChildItem -Path C:\ -Recurse -Filter "day*.ipynb" -ErrorAction SilentlyConti
 | 4 | 3 | ✅ Gotowe (zsynchronizowane) | Python → C++ z modelami frontier (porównanie 4 modeli) |
 | 4 | 4 | ✅ Gotowe (zsynchronizowane) | UI Gradio + benchmark 9 modeli |
 | 4 | 5 | ✅ Gotowe (zsynchronizowane) | Rozszerzenie Python → Rust + trudniejszy benchmark |
-| 5 | 1-5 | 🔍 Zrobione gdzie indziej — wymaga synchronizacji | RAG (Retrieval Augmented Generation) |
-| 6 | 1-5 | 🔍 Zrobione gdzie indziej — wymaga synchronizacji | Fine-tuning |
+| 5 | 1 | ✅ Gotowe (zsynchronizowane) | RAG słownikowy — pracownik wiedzy InsureLLM |
+| 5 | 2 | ✅ Gotowe (zsynchronizowane) | LangChain + ChromaDB + wizualizacja t-SNE |
+| 5 | 3 | ✅ Gotowe (zsynchronizowane) | Pipeline RAG LangChain + chatbot Gradio |
+| 5 | 4 | ✅ Gotowe (zsynchronizowane) | Framework ewaluacji RAG |
+| 5 | 5 | ✅ Gotowe (zsynchronizowane) | Zaawansowany RAG: chunking LLM + reranking + przepisywanie zapytań |
+| 6 | 1 | ✅ Gotowe (zsynchronizowane) | Kuracja danych — 820k produktów Amazon |
+| 6 | 2 | ✅ Gotowe (zsynchronizowane) | Pre-processing — podsumowania LLM przez Groq Batch API |
+| 6 | 3 | ✅ Gotowe (zsynchronizowane) | Modele bazowe — regresja liniowa, Random Forest, XGBoost |
+| 6 | 4 | ✅ Gotowe (zsynchronizowane) | Sieć neuronowa + benchmarking modeli frontier |
+| 6 | 5 | ✅ Gotowe (zsynchronizowane) | Fine-tuning OpenAI (GPT-4.1-nano) |
 | 7 | 1-5 | ✅ Gotowe (zsynchronizowane) | Fine-tuning QLoRA + ewaluacja modelu (Colab GPU) |
 | 8 | 1 | ✅ Gotowe (zsynchronizowane) | Modal.com + SpecialistAgent |
 | 8 | 2 | ✅ Gotowe (zsynchronizowane) | RAG (ChromaDB) + FrontierAgent + EnsembleAgent |
@@ -1022,6 +1217,88 @@ Używanie modeli frontier LLM do tłumaczenia kodu Python na wysokowydajne języ
 
 ---
 
+### 🗂️ TYDZIEŃ 5 — RAG: Ekspert Knowledge Worker dla InsureLLM
+
+Budowanie asystenta odpowiadającego na pytania dla fikcyjnej firmy ubezpieczeniowej (InsureLLM) — od prostego dopasowania słów kluczowych do zaawansowanego RAG z rerankingiem i przepisywaniem zapytań.
+
+---
+
+#### Dzień 1: RAG słownikowy (bazowy)
+- Słownik Python z plikami `.md` (pracownicy, produkty, kontrakty) — klucze to nazwiska/nazwy produktów
+- `get_relevant_context(message)` — dzieli wiadomość na słowa, szuka każdego w słowniku
+- Chatbot `gr.ChatInterface` z `gpt-4.1-nano` — działający produkt w jednym ekranie kodu
+
+#### Dzień 2: LangChain + ChromaDB + t-SNE
+- `DirectoryLoader` + `RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)`
+- Dwie opcje embeddingów: `HuggingFaceEmbeddings("all-MiniLM-L6-v2")` (darmowe, 384 dim.) vs. `OpenAIEmbeddings` (płatne)
+- `Chroma.from_documents()` → trwała baza wektorów (`vector_db/`)
+- Wykresy rozrzutu t-SNE 2D i 3D (Plotly) — wizualizacja klastrów typów dokumentów
+
+#### Dzień 3: Pipeline RAG LangChain + chatbot
+- `vectorstore.as_retriever()` + `ChatOpenAI(temperature=0)` + `SystemMessage`/`HumanMessage`
+- `gr.ChatInterface(answer_question).launch()` — pełny chatbot w 3 liniach kodu
+
+#### Dzień 4: Framework ewaluacji RAG
+- `evaluation/tests.jsonl` — zestaw pytań z referencyjnymi odpowiedziami
+- `evaluate_answer()` — sędzia LLM oceniający dokładność, kompletność i trafność
+- `evaluate_retrieval()` — sprawdza czy pobrane fragmenty zawierają istotną treść
+
+#### Dzień 5: Zaawansowany RAG
+- **Chunking LLM**: model tworzy semantyczne chunki (`headline`, `summary`, `content`) zamiast dzielenia na znaki
+- **Reranking**: drugi LLM reorderuje pobrane fragmenty według trafności (`RankOrder`)
+- **Przepisywanie zapytań**: zapytanie użytkownika jest przepisywane na bardziej precyzyjne
+- Pipeline końcowy: przepisz → pobierz → rerankuj → generuj
+
+**Stack:** `langchain`, `chromadb`, `openai` (embeddingi), `pydantic`, `sklearn` (t-SNE), `plotly`.
+
+---
+
+### 🗂️ TYDZIEŃ 6 — „The Price is Right": Dane + Klasyczne ML + Sieci Neuronowe
+
+Budowanie predyktora cen produktów od zera na bazie 820 000 zeskrapowanych opisów produktów Amazon.
+
+---
+
+#### Dzień 1: Kuracja danych — 820k produktów Amazon
+- 8 kategorii z `McAuley-Lab/Amazon-Reviews-2023` (HuggingFace)
+- Filtr cenowy $1–$1000, filtr jakości opisów
+- Próbkowanie ważone ceną (820k pozycji), deduplikacja, split 80/10/10
+- Wykresy: histogramy cen i długości, scatter cena vs. waga vs. długość tekstu
+
+#### Dzień 2: Pre-processing — Groq Batch API
+- Prompt systemowy: przepisanie opisów na 5-polowy format (Tytuł, Kategoria, Marka, Opis, Szczegóły)
+- Pliki JSONL (1000 pozycji/plik) → `groq.batches.create()` → polowanie na wyniki
+- Klasa `Batch` — hermetyzuje cały cykl: utwórz/uruchom/pobierz
+- Koszt: <$1 dla Lite (20k), ~$30 dla Full (800k)
+
+#### Dzień 3: Modele bazowe + klasyczne ML (RMSE — niżej = lepiej)
+
+| Model | RMSE |
+|-------|------|
+| Stały predyktor | 106,18 |
+| Regresja liniowa (3 cechy) | 101,56 |
+| NLP + Regresja liniowa (BoW) | 76,81 |
+| Random Forest | 72,28 |
+| XGBoost | 68,23 |
+
+#### Dzień 4: Sieć neuronowa od zera + benchmarking frontier
+
+- **Benchmark ludzki** (100 próbek, CSV): RMSE 87,62 (gorszy niż XGBoost!)
+- **8-warstwowa sieć PyTorch** (HashingVectorizer 5000 cech, 2 epoki, Adam): RMSE 63,97
+- **Modele frontier zero-shot**:
+  - GPT-4.1-nano: 62,51 | Grok 4.1 Fast: 57,62 | Gemini 3 Pro: 50,54
+  - Claude Opus 4.5: oceniony | GPT-5.1 (`reasoning_effort="high"`): **44,74**
+
+#### Dzień 5: Fine-tuning OpenAI (GPT-4.1-nano)
+- Format JSONL: user → opis produktu, assistant → `$cena`
+- `openai.fine_tuning.jobs.create()` z `gpt-4.1-nano-2025-04-14`, `n_epochs=1`
+- Wyniki wg rozmiaru danych: 100 próbek → 96,58 | 2000 → 82,26 | **20 000 → 67,75**
+- **Bonus — Deep Neural Network**: większa sieć trenowana 5 epok na 800k próbkach → RMSE **46,49**
+
+**Stack:** `datasets`, `groq`, `litellm`, `sklearn`, `xgboost`, `torch`, `openai` (Files + Fine-tuning API).
+
+---
+
 ### 🗂️ TYDZIEŃ 7 — Fine-tuning z QLoRA: „The Price is Right"
 
 Fine-tuning **Llama 3.2-3B** na 400 000 opisach produktów Amazon do przewidywania cen produktów z tekstu — i pobicie każdego modelu frontierowego, w tym GPT-5.1.
@@ -1290,5 +1567,5 @@ llm_engineering/
 
 ---
 
-*Dokument przygotowany: 27 maja 2026 | Zaktualizowany: 19 czerwca 2026 (Tygodnie 3, 4, 7 i 8 dodane)*
-*Document prepared: May 27, 2026 | Updated: June 19, 2026 (Weeks 3, 4, 7 and 8 added)*
+*Dokument przygotowany: 27 maja 2026 | Zaktualizowany: 19 czerwca 2026 (Tygodnie 3–8 udokumentowane)*
+*Document prepared: May 27, 2026 | Updated: June 19, 2026 (Weeks 3–8 documented)*

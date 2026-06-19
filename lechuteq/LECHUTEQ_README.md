@@ -58,8 +58,12 @@ Get-ChildItem -Path C:\ -Recurse -Filter "day*.ipynb" -ErrorAction SilentlyConti
 | 4 | 1-5 | 🔍 Done elsewhere — needs sync | Code Generation |
 | 5 | 1-5 | 🔍 Done elsewhere — needs sync | RAG (Retrieval Augmented Generation) |
 | 6 | 1-5 | 🔍 Done elsewhere — needs sync | Fine-tuning |
-| 7 | - | ⏳ Pending | Advanced Fine-tuning (Colab GPU) |
-| 8 | - | ⏳ Pending | Agentic AI |
+| 7 | 1-5 | ✅ Done (synced) | QLoRA fine-tuning + model evaluation (Colab GPU) |
+| 8 | 1 | ✅ Done (synced) | Modal.com cloud deployment + SpecialistAgent |
+| 8 | 2 | ✅ Done (synced) | RAG vector store + FrontierAgent + EnsembleAgent |
+| 8 | 3 | ✅ Done (synced) | ScannerAgent + MessagingAgent (Pushover) |
+| 8 | 4 | ✅ Done (synced) | AutonomousPlanningAgent + agentic loop |
+| 8 | 5 | ✅ Done (synced) | "The Price is Right" Gradio UI finale |
 
 ---
 
@@ -278,6 +282,115 @@ All Week 3 notebooks ran on **Google Colab** with a free Tesla T4 GPU (16 GB VRA
 
 ---
 
+### 🗂️ WEEK 8 — Agentic AI: "The Price is Right"
+
+The capstone project. A fully autonomous multi-agent system that scans the internet for product deals, estimates true product value using multiple AI strategies, and pushes notifications to your phone — all orchestrated by a planning agent inside a Gradio UI.
+
+**Agent architecture:**
+
+```
+DealAgentFramework
+├── ScannerAgent       — scrapes deal sites, uses GPT to select top 5
+├── EnsembleAgent
+│   ├── FrontierAgent      — RAG over 400k Amazon products + GPT-5.1
+│   ├── SpecialistAgent    — fine-tuned Llama on Modal.com cloud
+│   └── NeuralNetworkAgent — deep neural network from Week 6
+├── MessagingAgent     — Pushover push notifications to phone
+└── AutonomousPlanningAgent — LLM-driven tool-calling orchestration loop
+```
+
+---
+
+#### Day 1: Modal.com Cloud Deployment + SpecialistAgent
+**Goal:** Deploy a fine-tuned LLM as a production-grade API service on Modal.com (serverless GPU cloud), then wire it into the first agent.
+
+**What was built:**
+- Modal.com account setup + API token configuration (`modal token set`)
+- `hello.py` — simple Modal app demonstrating local vs. remote execution and EU region routing
+- `llama.py` — Llama text generation deployed as a Modal remote function (`generate.remote()`)
+- `pricer_ephemeral.py` — ephemeral Modal app: sends product description → returns price estimate using the Week 6 fine-tuned model
+- `pricer_service.py` / `pricer_service2.py` — persistent **deployed** Modal services (survived beyond notebook session)
+- `Preprocessor` class — cleans product descriptions before sending to the pricer (uses Llama 3.2 or Groq)
+- `SpecialistAgent` — wraps the deployed Modal pricer behind a clean `.price(description)` interface
+- Explored keeping Modal containers warm to eliminate 30-second cold-start latency
+
+**Tech stack:** `modal`, `agents/specialist_agent.py`, `agents/preprocessor.py`, `litellm`.
+
+---
+
+#### Day 2: RAG Vector Store + FrontierAgent + EnsembleAgent
+**Goal:** Build a RAG-powered pricing agent over 400,000 scraped Amazon products, then combine all pricing strategies into an ensemble.
+
+**What was built:**
+- ChromaDB persistent vector store (`products_vectorstore/`) populated with embeddings of 400k Amazon product descriptions
+- `sentence-transformers/all-MiniLM-L6-v2` for encoding (384-dimensional vectors)
+- t-SNE dimensionality reduction + Plotly 2D/3D interactive scatter plot to visualize product clusters by category
+- `find_similars(item)` — semantic search: given a product, find 5 similar products and their prices
+- `make_context()` — builds a RAG context block of similar products to inject into the LLM prompt
+- `gpt_5_1_rag(item)` — `gpt-5.1` with RAG context + `reasoning_effort="none"` + `seed=42`
+- **EnsembleAgent** — weighted average: RAG frontier (80%) + Modal specialist (10%) + neural network (10%)
+- `FrontierAgent` class — encapsulates the RAG + GPT-5.1 pipeline
+- `NeuralNetworkAgent` class — wraps the deep neural network from Week 6
+- `EnsembleAgent` class — combines all three strategies
+
+**Tech stack:** `chromadb`, `sentence-transformers`, `sklearn` (t-SNE), `plotly`, `litellm`, `modal`, `agents/frontier_agent.py`, `agents/neural_network_agent.py`, `agents/ensemble_agent.py`.
+
+---
+
+#### Day 3: ScannerAgent + MessagingAgent (Pushover)
+**Goal:** Build agents that find deals on the internet and send push notifications to a phone.
+
+**What was built:**
+- `ScrapedDeal.fetch()` — scrapes deal aggregator sites for product listings
+- GPT-5-mini with structured JSON output (`response_format=DealSelection`) to select the 5 most promising deals with clear prices
+- `ScannerAgent` — wraps fetch + LLM filtering into a clean `.scan()` interface
+- **Pushover integration** — push notifications to phone via `https://api.pushover.net/1/messages.json`
+- `MessagingAgent` — wraps Pushover with `.push(message)` and `.notify(description, deal_price, true_value, url)` methods
+- End-to-end test: `agent.notify("Samsung 60 inch LED TV", 300, 1000, "www.samsung.com")` → phone notification
+
+**Tech stack:** `openai` (structured output, `reasoning_effort="minimal"`), `requests` (Pushover API), `agents/scanner_agent.py`, `agents/messaging_agent.py`, `agents/deals.py`.
+
+---
+
+#### Day 4: AutonomousPlanningAgent (Agentic Loop)
+**Goal:** Build a fully autonomous agent that plans its own multi-step workflow using LLM-driven tool calling — no hardcoded sequence.
+
+**What was built:**
+- Prototype with 3 fake stub functions to understand the agent loop pattern:
+  - `scan_the_internet_for_bargains()` → returns hardcoded deals
+  - `estimate_true_value(description)` → always returns $300
+  - `notify_user_of_deal(description, deal_price, estimate, url)` → prints message
+- JSON Schema tool definitions for all three functions
+- **Agent loop:** `while not done: response = openai.chat.completions.create(..., tools=tools)` — LLM decides which tools to call and in what order
+- `handle_tool_call(message)` — dispatches tool calls dynamically via `globals().get(tool_name)`
+- **AutonomousPlanningAgent** — swaps fake stubs for real agents (ScannerAgent → EnsembleAgent → MessagingAgent), fully autonomous end-to-end pipeline
+- `agent.plan()` — triggers the full autonomous deal-hunting loop
+
+**Tech stack:** `openai` (tool calling, `gpt-5.1`), `chromadb`, `agents/autonomous_planning_agent.py`, `agents/scanner_agent.py`, `agents/ensemble_agent.py`.
+
+---
+
+#### Day 5: "The Price is Right" — Gradio UI Finale
+**Goal:** Wrap the entire multi-agent system in a polished Gradio UI and ship the capstone product.
+
+**What was built:**
+- Iterative Gradio `gr.Blocks` UI construction (built piece by piece in notebook)
+- Final UI layout: deal list table + opportunity display + live agent log
+- `DealAgentFramework` — orchestrates all agents, manages `memory.json` (persists discovered deals across runs)
+- `DealAgentFramework.reset_memory()` — resets deal history
+- `price_is_right.py` — standalone launchable product (`uv run price_is_right.py`)
+- The product continuously scans, prices, and notifies — fully autonomous, runs indefinitely
+
+**Tech stack:** `gradio` (`gr.Blocks`, `gr.DataFrame`, `gr.Timer`), `deal_agent_framework.py`, `agents/` package, `memory.json`.
+
+---
+
+### 🗂️ WEEK 7 — Fine-tuning with QLoRA
+
+> Week 7 notebooks are committed (days 1–5 + NEW_ updated variants). Full breakdown to be added.
+
+---
+
 ### 🛠️ Common Tech Stack (Across All Weeks)
 
 | Category | Libraries |
@@ -293,8 +406,9 @@ All Week 3 notebooks ran on **Google Colab** with a free Tesla T4 GPU (16 GB VRA
 | Data | `sqlite3` (custom upgrade!), `datasets==3.6.0` |
 | Display | `IPython.display`, Markdown streaming |
 | Media | `Pillow`, `base64`, `pydub`, `soundfile` |
-| Cloud | Google Colab (T4 GPU free tier, A100 paid) |
-| Env | `python-dotenv`, Colab Secrets (`userdata.get`) |
+| Cloud | Google Colab (T4/A100 GPU), Modal.com (serverless GPU) |
+| Agentic AI | `modal`, `chromadb`, `sentence-transformers`, Pushover API, `agents/` package |
+| Env | `python-dotenv`, Colab Secrets, Modal Secrets |
 | Runtime | Python 3.12, Jupyter Lab 4.5, UV package manager |
 
 ---
@@ -329,9 +443,11 @@ You've already mastered:
 - **Tip:** Track experiments early. Don't fine-tune blindly.
 - The course uses HuggingFace `datasets==3.6.0` (pinned for compatibility)
 
-#### 6. **Week 8 — Agentic AI**
-- This builds on EVERYTHING. Tools (Week 2 Day 4) + RAG (Week 5) + Fine-tuning (Week 7) + Multi-step pipelines (Week 1 Day 5)
-- **Tip:** Sketch the agent architecture on paper before coding. Identify which sub-agent does which task.
+#### 6. **Week 8 — Agentic AI ✅ DONE**
+- You built the full capstone: ScannerAgent → EnsembleAgent (RAG + Modal specialist + neural net) → MessagingAgent → AutonomousPlanningAgent → Gradio UI
+- **Key pattern:** The agentic `while not done` loop with `handle_tool_call()` is reusable for any autonomous agent — it's the same pattern as Week 2 Day 4, massively scaled up
+- **Modal.com is production deployment:** `modal deploy` converts your local code into a scalable cloud API — use this pattern for any ML model you want to serve at scale
+- **EnsembleAgent insight:** 80/10/10 weighting (frontier RAG / specialist / neural net) outperformed any single model alone — ensemble thinking is a core ML engineering skill
 
 #### 7. **General Best Practices Going Forward**
 - ✅ **Keep using SQLite** — you already proved it works better than dicts. Use it for any structured state.
@@ -373,7 +489,19 @@ llm_engineering/
 │   ├── Week 3 Day 3 - tokenizers.ipynb # Tokenizers deep-dive
 │   ├── Week 3 Day 4 - models.ipynb  # AutoModelForCausalLM + 4-bit quant
 │   └── Week 3 Day 5 - Meeting Minutes product.ipynb  # Audio → Whisper → Llama
-└── CLAUDE.md                        # Claude Code guidance file
+├── week4/                           # Days 3-5 synced; Days 1-2 missing
+├── week5/                           # RAG + LangChain + ChromaDB — fully synced
+├── week6/                           # Fine-tuning data prep — fully synced
+├── week7/                           # QLoRA fine-tuning — fully synced
+└── week8/
+    ├── agents/                      # Full multi-agent package
+    ├── day1.ipynb                   # Modal.com + SpecialistAgent
+    ├── day2.ipynb                   # RAG + FrontierAgent + EnsembleAgent
+    ├── day3.ipynb                   # ScannerAgent + MessagingAgent
+    ├── day4.ipynb                   # AutonomousPlanningAgent
+    ├── day5.ipynb                   # Gradio UI finale
+    ├── deal_agent_framework.py      # Orchestrator + memory.json
+    └── price_is_right.py            # Standalone launchable product
 ```
 
 ---
@@ -431,8 +559,12 @@ Get-ChildItem -Path C:\ -Recurse -Filter "day*.ipynb" -ErrorAction SilentlyConti
 | 4 | 1-5 | 🔍 Zrobione gdzie indziej — wymaga synchronizacji | Generowanie kodu |
 | 5 | 1-5 | 🔍 Zrobione gdzie indziej — wymaga synchronizacji | RAG (Retrieval Augmented Generation) |
 | 6 | 1-5 | 🔍 Zrobione gdzie indziej — wymaga synchronizacji | Fine-tuning |
-| 7 | - | ⏳ W planach | Zaawansowany fine-tuning (Colab GPU) |
-| 8 | - | ⏳ W planach | Agentic AI |
+| 7 | 1-5 | ✅ Gotowe (zsynchronizowane) | Fine-tuning QLoRA + ewaluacja modelu (Colab GPU) |
+| 8 | 1 | ✅ Gotowe (zsynchronizowane) | Modal.com + SpecialistAgent |
+| 8 | 2 | ✅ Gotowe (zsynchronizowane) | RAG (ChromaDB) + FrontierAgent + EnsembleAgent |
+| 8 | 3 | ✅ Gotowe (zsynchronizowane) | ScannerAgent + MessagingAgent (Pushover) |
+| 8 | 4 | ✅ Gotowe (zsynchronizowane) | AutonomousPlanningAgent + pętla agentyczna |
+| 8 | 5 | ✅ Gotowe (zsynchronizowane) | Finał: "The Price is Right" — UI Gradio |
 
 ---
 
@@ -647,6 +779,105 @@ Wszystkie notebooki Tygodnia 3 uruchamiały się na **Google Colab** z darmowym 
 
 ---
 
+### 🗂️ TYDZIEŃ 8 — Agentic AI: „The Price is Right"
+
+Projekt kulminacyjny. W pełni autonomiczny system wieloagentowy, który przeszukuje internet w poszukiwaniu okazji produktowych, szacuje prawdziwą wartość produktów za pomocą wielu strategii AI i wysyła powiadomienia push na telefon — wszystko orkiestrowane przez agenta planującego w interfejsie Gradio.
+
+**Architektura agentów:**
+
+```
+DealAgentFramework
+├── ScannerAgent       — scraping stron z okazjami, GPT wybiera top 5
+├── EnsembleAgent
+│   ├── FrontierAgent      — RAG na 400k produktach Amazon + GPT-5.1
+│   ├── SpecialistAgent    — fine-tuned Llama na Modal.com (chmura GPU)
+│   └── NeuralNetworkAgent — głęboka sieć neuronowa z Tygodnia 6
+├── MessagingAgent     — powiadomienia push Pushover na telefon
+└── AutonomousPlanningAgent — autonomiczna pętla tool-calling sterowana LLM
+```
+
+---
+
+#### Dzień 1: Wdrożenie w chmurze Modal.com + SpecialistAgent
+**Cel:** Wdrożenie fine-tuned LLM jako produkcyjnego serwisu API na Modal.com (bezserwerowa chmura GPU), a następnie podłączenie go do pierwszego agenta.
+
+**Co zostało zbudowane:**
+- Konfiguracja konta Modal.com + token API (`modal token set`)
+- `hello.py` — prosta aplikacja Modal demonstrująca lokalne vs. zdalne wykonanie
+- `llama.py` — generowanie tekstu Llama wdrożone jako zdalna funkcja Modal
+- `pricer_ephemeral.py` — efemeryczna aplikacja Modal: opis produktu → szacowana cena
+- `pricer_service.py` / `pricer_service2.py` — trwałe **wdrożone** serwisy Modal
+- Klasa `Preprocessor` — oczyszcza opisy produktów przed wysłaniem do pricera
+- `SpecialistAgent` — opakowuje wdrożony pricer Modal za czystym interfejsem `.price(description)`
+
+**Stack technologiczny:** `modal`, `agents/specialist_agent.py`, `agents/preprocessor.py`, `litellm`.
+
+---
+
+#### Dzień 2: Baza wektorowa RAG + FrontierAgent + EnsembleAgent
+**Cel:** Zbudowanie agenta wyceny opartego na RAG nad 400 000 produktami Amazon, a następnie połączenie wszystkich strategii wyceny w ensemble.
+
+**Co zostało zbudowane:**
+- Trwała baza ChromaDB (`products_vectorstore/`) z osadzeniami 400k opisów produktów
+- `sentence-transformers/all-MiniLM-L6-v2` do kodowania (wektory 384-wymiarowe)
+- Redukcja wymiarów t-SNE + interaktywny wykres rozrzutu 2D/3D Plotly
+- `find_similars(item)` — semantyczne wyszukiwanie 5 podobnych produktów z cenami
+- **EnsembleAgent** — ważona średnia: RAG frontier (80%) + Modal specialist (10%) + sieć neuronowa (10%)
+- Klasy `FrontierAgent`, `NeuralNetworkAgent`, `EnsembleAgent`
+
+**Stack technologiczny:** `chromadb`, `sentence-transformers`, `sklearn` (t-SNE), `plotly`, `litellm`, `modal`.
+
+---
+
+#### Dzień 3: ScannerAgent + MessagingAgent (Pushover)
+**Cel:** Zbudowanie agentów znajdujących okazje w internecie i wysyłających powiadomienia push na telefon.
+
+**Co zostało zbudowane:**
+- `ScrapedDeal.fetch()` — scraping stron agregujących okazje produktowe
+- GPT-5-mini ze strukturalnym wyjściem JSON (`response_format=DealSelection`) do wyboru 5 najlepszych okazji
+- `ScannerAgent` — opakowuje scraping + filtrowanie LLM w interfejs `.scan()`
+- Integracja **Pushover** — powiadomienia push przez API (`https://api.pushover.net/1/messages.json`)
+- `MessagingAgent` — `.push(message)` i `.notify(opis, cena, wartość, url)`
+
+**Stack technologiczny:** `openai` (strukturalne wyjście), `requests` (Pushover API), `agents/scanner_agent.py`, `agents/messaging_agent.py`.
+
+---
+
+#### Dzień 4: AutonomousPlanningAgent (Pętla agentyczna)
+**Cel:** Zbudowanie w pełni autonomicznego agenta, który planuje własny wieloetapowy przepływ pracy za pomocą wywołań narzędzi sterowanych przez LLM.
+
+**Co zostało zbudowane:**
+- Prototyp z 3 funkcjami-zaślepkami do zrozumienia wzorca pętli agentycznej
+- Definicje narzędzi w JSON Schema dla wszystkich trzech funkcji
+- **Pętla agentyczna:** `while not done: response = openai.chat.completions.create(..., tools=tools)` — LLM decyduje, które narzędzia wywołać i w jakiej kolejności
+- `handle_tool_call(message)` — dynamiczne wywoływanie narzędzi przez `globals().get(tool_name)`
+- **AutonomousPlanningAgent** — zamienia zaślepki na prawdziwe agenty (ScannerAgent → EnsembleAgent → MessagingAgent)
+- `agent.plan()` — uruchamia pełną autonomiczną pętlę polowania na okazje
+
+**Stack technologiczny:** `openai` (tool calling, `gpt-5.1`), `chromadb`, `agents/autonomous_planning_agent.py`.
+
+---
+
+#### Dzień 5: Finał — UI Gradio „The Price is Right"
+**Cel:** Owinięcie całego systemu wieloagentowego w dopracowany interfejs Gradio i wydanie produktu kulminacyjnego.
+
+**Co zostało zbudowane:**
+- Iteratywna budowa UI `gr.Blocks` krok po kroku w notebooku
+- Finalny layout: tabela okazji + wyświetlanie okazji + dziennik agenta na żywo
+- `DealAgentFramework` — orkiestruje wszystkich agentów, zarządza `memory.json`
+- `price_is_right.py` — samodzielny produkt do uruchomienia (`uv run price_is_right.py`)
+- Produkt ciągle skanuje, wycenia i powiadamia — w pełni autonomiczny
+
+**Stack technologiczny:** `gradio` (`gr.Blocks`, `gr.DataFrame`, `gr.Timer`), `deal_agent_framework.py`, pakiet `agents/`, `memory.json`.
+
+---
+
+### 🗂️ TYDZIEŃ 7 — Fine-tuning z QLoRA
+
+> Notebooki Tygodnia 7 są zacommitowane (dni 1–5 + zaktualizowane warianty NEW_). Szczegółowy opis do dodania.
+
+---
+
 ### 🛠️ Wspólny Stack Technologiczny (Wszystkie tygodnie)
 
 | Kategoria | Biblioteki |
@@ -662,7 +893,8 @@ Wszystkie notebooki Tygodnia 3 uruchamiały się na **Google Colab** z darmowym 
 | Dane | `sqlite3` (własne usprawnienie!), `datasets==3.6.0` |
 | Wyświetlanie | `IPython.display`, strumieniowanie Markdown |
 | Media | `Pillow`, `base64`, `pydub`, `soundfile` |
-| Chmura | Google Colab (darmowy T4 GPU, płatny A100) |
+| Chmura | Google Colab (T4/A100 GPU), Modal.com (bezserwerowe GPU) |
+| Agentic AI | `modal`, `chromadb`, `sentence-transformers`, API Pushover, pakiet `agents/` |
 | Środowisko | `python-dotenv`, Colab Secrets (`userdata.get`) |
 | Runtime | Python 3.12, Jupyter Lab 4.5, menedżer pakietów UV |
 
@@ -698,9 +930,11 @@ Już opanowałeś:
 - **Wskazówka:** Śledź eksperymenty od początku. Nie rób fine-tuningu w ciemno.
 - Kurs używa HuggingFace `datasets==3.6.0` (przypięte dla kompatybilności)
 
-#### 6. **Tydzień 8 — Agentic AI**
-- Buduje się na WSZYSTKIM. Narzędzia (Tydzień 2 Dzień 4) + RAG (Tydzień 5) + Fine-tuning (Tydzień 7) + Pipeliny wieloetapowe (Tydzień 1 Dzień 5)
-- **Wskazówka:** Naszkicuj architekturę agenta na papierze przed kodowaniem. Zidentyfikuj który sub-agent wykonuje które zadanie.
+#### 6. **Tydzień 8 — Agentic AI ✅ UKOŃCZONE**
+- Zbudowałeś pełny projekt kulminacyjny: ScannerAgent → EnsembleAgent (RAG + Modal specialist + sieć neuronowa) → MessagingAgent → AutonomousPlanningAgent → UI Gradio
+- **Kluczowy wzorzec:** Pętla agentyczna `while not done` z `handle_tool_call()` jest wielokrotnie używalna dla dowolnego autonomicznego agenta
+- **Modal.com to produkcyjne wdrożenie:** `modal deploy` zamienia lokalny kod w skalowalny API chmurowy — używaj tego wzorca dla każdego modelu ML, który chcesz serwować
+- **Insight EnsembleAgent:** Ważenie 80/10/10 (frontier RAG / specialist / sieć neuronowa) przewyższało każdy pojedynczy model — myślenie ensemble to kluczowa umiejętność w inżynierii ML
 
 #### 7. **Ogólne najlepsze praktyki na przyszłość**
 - ✅ **Używaj nadal SQLite** — już udowodniłeś, że działa lepiej niż słowniki. Używaj go dla każdego stanu strukturalnego.
@@ -750,5 +984,5 @@ llm_engineering/
 
 ---
 
-*Dokument przygotowany: 27 maja 2026 | Zaktualizowany: 19 czerwca 2026 (Tydzień 3 dodany)*
-*Document prepared: May 27, 2026 | Updated: June 19, 2026 (Week 3 added)*
+*Dokument przygotowany: 27 maja 2026 | Zaktualizowany: 19 czerwca 2026 (Tygodnie 3 i 8 dodane)*
+*Document prepared: May 27, 2026 | Updated: June 19, 2026 (Weeks 3 and 8 added)*
